@@ -1,0 +1,12 @@
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Local configuration and secrets (never commit these)
+.env
+.env.*
+!.env.example
+supabase/.temp/
+
+# Temporary release files
+release/
