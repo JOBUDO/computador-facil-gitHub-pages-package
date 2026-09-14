@@ -22,7 +22,7 @@ Give the deployer these documents in order:
 dist/                         Published static website
   index.html                  Single-page app shell
   app.js                      Browser app and public Supabase configuration
-  styles.css, auth.css         Styling
+  styles.css, auth.css        Styling
 .github/workflows/            GitHub Pages deployment workflow
 ```
 
