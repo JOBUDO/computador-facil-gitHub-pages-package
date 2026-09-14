@@ -1,7 +1,8 @@
 const URL = "https://nhmzuqhjhkdklezimmll.supabase.co",
-  KEY = "sb_publishable_kPQkmWNskYEF979I7d6jUg__XIBQErT",
+  KEY = "sb_publishable_8Mna1mVDvCrbwsJkSvofWg_pY8pelK7",
   FN = URL + "/functions/v1",
-  SK = "computador-facil-session";
+  SK = "computador-facil-session",
+  BASE = location.origin + location.pathname;
 let session = JSON.parse(localStorage.getItem(SK) || "null"),
   user = session?.user,
   profile, sub, lessons = [],
@@ -63,7 +64,7 @@ authForm.onsubmit = async e => {
     let r;
     if (mode === "signup") {
       if (!name) return msg("Escreve o teu nome.");
-      r = await fetch(URL + "/auth/v1/signup?redirect_to=" + encodeURIComponent(location.origin), {
+      r = await fetch(URL + "/auth/v1/signup?redirect_to=" + encodeURIComponent(BASE), {
         method: "POST",
         headers: {
           apikey: KEY,
@@ -102,7 +103,7 @@ authForm.onsubmit = async e => {
 forgotPassword.onclick = async () => {
   const email = authEmail.value.trim();
   if (!email) return msg("Escreve primeiro o teu email.");
-  const r = await fetch(URL + "/auth/v1/recover?redirect_to=" + encodeURIComponent(location.origin), {
+  const r = await fetch(URL + "/auth/v1/recover?redirect_to=" + encodeURIComponent(BASE), {
     method: "POST",
     headers: {
       apikey: KEY,
@@ -114,7 +115,7 @@ forgotPassword.onclick = async () => {
   });
   msg(r.ok ? "Enviámos as instruções para o teu email." : "Não foi possível enviar agora.", r.ok)
 };
-googleBtn.onclick = () => location.href = URL + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(location.origin);
+googleBtn.onclick = () => location.href = URL + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(BASE);
 async function oauthRedirect() {
   const h = new URLSearchParams(location.hash.slice(1));
   const at = h.get("access_token");
@@ -280,7 +281,7 @@ async function start() {
     document.querySelector(".bottom-nav").classList.toggle("hidden", !access());
     if (new URLSearchParams(location.search).get("checkout") === "success") {
       app.innerHTML = '<div class="instruction"><h3>Pagamento recebido</h3><p>Estamos a confirmar o teu acesso. A página atualizará dentro de instantes.</p></div>';
-      setTimeout(() => location.href = location.origin, 4000)
+      setTimeout(() => location.href = BASE, 4000)
     } else render("home")
   } catch (x) {
     app.innerHTML = `<div class="instruction"><h3>Não foi possível carregar a conta</h3><p>${x.message}</p></div>`
