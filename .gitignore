@@ -13,3 +13,6 @@ release/
 
 # Generated GitHub Pages artifact; edit site/ instead
 /dist/
+
+# Local JavaScript dependencies
+/node_modules/

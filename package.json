@@ -1,0 +1,22 @@
+{
+  "name": "computador-facil-pages",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "eslint site scripts tests eslint.config.js",
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "node --test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.9.1",
+    "jsdom": "30.0.1",
+    "typescript": "7.0.2"
+  }
+}

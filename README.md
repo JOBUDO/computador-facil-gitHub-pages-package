@@ -27,6 +27,10 @@ dist/                         Generated Pages artifact (ignored by Git)
 .github/workflows/            GitHub Pages deployment workflow
 ```
 
+## Frontend development
+
+Use Node.js 24 and pnpm 11. Run `pnpm install`, then `pnpm check` to lint, type-check, test, and build the static site. Edit files in `site/`; `pnpm build` copies them into ignored `dist/` for deployment. The browser entry point is an ES module, with DOM rendering in `site/views.js` and state helpers in `site/model.js`.
+
 ## Important security boundary
 
 GitHub Pages is intentionally only the website host. Never add Stripe secret/restricted keys, Stripe webhook signing secrets, or Supabase service-role keys to this repository, GitHub Pages settings, browser JavaScript or a `CNAME` file.
