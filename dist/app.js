@@ -27,6 +27,13 @@ async function api(path, opt = {}) {
 }
 const access = () => sub && ["trialing", "active"].includes(sub.status) && new Date(sub.access_ends_at) > new Date();
 const first = () => (profile?.full_name || user?.email?.split("@")[0] || "Amigo").trim().split(/\s+/)[0];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+}[c]));
 const pct = () => lessons.length ? Math.round(done.length / lessons.length * 100) : 0;
 
 function msg(t, ok = false) {
@@ -180,7 +187,7 @@ function render(v = "home") {
 
 function paywall() {
   document.querySelector(".bottom-nav").classList.add("hidden");
-  app.innerHTML = `<header class="page-heading"><p class="eyebrow">CONTA CRIADA</p><h1>Desbloqueia a tua aprendizagem</h1><p>Olá, ${first()}. O teu plano está pronto.</p></header><section class="paywall"><span class="status-pill">4 DIAS DE ACESSO COMPLETO</span><div class="paywall-price">£5 <small>pagamento inicial</small></div><ul class="paywall-list"><li>Todas as aulas em português</li><li>Exercícios práticos passo a passo</li><li>Progresso guardado na tua conta</li><li>Assistente de aprendizagem Lia</li></ul><button class="primary full" id="checkoutBtn">Começar por £5 <span>→</span></button><p class="billing-note">Hoje pagas £5. Após quatro dias, a assinatura continua por £15.99 por mês até cancelares.</p><p id="checkoutMessage" class="form-message"></p></section><button class="text-button" id="logoutBtn">Sair desta conta</button>`;
+  app.innerHTML = `<header class="page-heading"><p class="eyebrow">CONTA CRIADA</p><h1>Desbloqueia a tua aprendizagem</h1><p>Olá, ${esc(first())}. O teu plano está pronto.</p></header><section class="paywall"><span class="status-pill">4 DIAS DE ACESSO COMPLETO</span><div class="paywall-price">£5 <small>pagamento inicial</small></div><ul class="paywall-list"><li>Todas as aulas em português</li><li>Exercícios práticos passo a passo</li><li>Progresso guardado na tua conta</li><li>Assistente de aprendizagem Lia</li></ul><button class="primary full" id="checkoutBtn">Começar por £5 <span>→</span></button><p class="billing-note">Hoje pagas £5. Após quatro dias, a assinatura continua por £15.99 por mês até cancelares.</p><p id="checkoutMessage" class="form-message"></p></section><button class="text-button" id="logoutBtn">Sair desta conta</button>`;
   checkoutBtn.onclick = checkout;
   logoutBtn.onclick = logout
 }
@@ -204,7 +211,7 @@ async function checkout() {
 
 function home() {
   const n = lessons.find(x => !done.includes(x.id)) || lessons[0];
-  app.innerHTML = `<section class="hero"><p class="eyebrow">O TEU PLANO PERSONALIZADO</p><h1>Olá, ${first()}! 👋</h1><p>Hoje basta uma pequena conquista. Continua ao teu ritmo.</p><span class="streak">✓ Acesso ativo</span></section><div class="section-title"><h2>Continua a aprender</h2><button data-view="courses">Ver todas</button></div><button class="continue-card" data-lesson="${n.id}"><span class="lesson-icon">${n.icon}</span><span><h3>${n.title}</h3><p>${n.duration_minutes} min · ${n.level}</p><span class="progress-track"><span class="progress-bar" style="display:block;width:${pct()}%"></span></span></span><span class="round-arrow">→</span></button><div class="section-title"><h2>O teu progresso</h2></div><div class="profile-card"><div class="stats"><div class="stat"><strong>${done.length}</strong><span>AULAS</span></div><div class="stat"><strong>${pct()}%</strong><span>PROGRESSO</span></div><div class="stat"><strong>${lessons.length}</strong><span>TOTAL</span></div></div></div>`
+  app.innerHTML = `<section class="hero"><p class="eyebrow">O TEU PLANO PERSONALIZADO</p><h1>Olá, ${esc(first())}! 👋</h1><p>Hoje basta uma pequena conquista. Continua ao teu ritmo.</p><span class="streak">✓ Acesso ativo</span></section><div class="section-title"><h2>Continua a aprender</h2><button data-view="courses">Ver todas</button></div><button class="continue-card" data-lesson="${n.id}"><span class="lesson-icon">${n.icon}</span><span><h3>${n.title}</h3><p>${n.duration_minutes} min · ${n.level}</p><span class="progress-track"><span class="progress-bar" style="display:block;width:${pct()}%"></span></span></span><span class="round-arrow">→</span></button><div class="section-title"><h2>O teu progresso</h2></div><div class="profile-card"><div class="stats"><div class="stat"><strong>${done.length}</strong><span>AULAS</span></div><div class="stat"><strong>${pct()}%</strong><span>PROGRESSO</span></div><div class="stat"><strong>${lessons.length}</strong><span>TOTAL</span></div></div></div>`
 }
 
 function courses() {
@@ -241,7 +248,7 @@ function helper() {
 
 function account() {
   const end = new Date(sub.access_ends_at).toLocaleDateString("pt-PT");
-  app.innerHTML = `<header class="page-heading"><p class="eyebrow">O TEU ESPAÇO</p><h1>Perfil</h1></header><section class="profile-card"><div class="large-avatar">${first()[0].toUpperCase()}</div><h2>${profile.full_name}</h2><p>${user.email}</p><span class="status-pill">ACESSO ATÉ ${end}</span></section><div class="settings"><button id="portalBtn">Gerir assinatura e pagamentos <span>›</span></button><button id="logoutBtn">Terminar sessão <span>›</span></button></div><p id="portalMessage" class="form-message"></p>`;
+  app.innerHTML = `<header class="page-heading"><p class="eyebrow">O TEU ESPAÇO</p><h1>Perfil</h1></header><section class="profile-card"><div class="large-avatar">${esc(first()[0].toUpperCase())}</div><h2>${esc(profile.full_name)}</h2><p>${esc(user.email)}</p><span class="status-pill">ACESSO ATÉ ${end}</span></section><div class="settings"><button id="portalBtn">Gerir assinatura e pagamentos <span>›</span></button><button id="logoutBtn">Terminar sessão <span>›</span></button></div><p id="portalMessage" class="form-message"></p>`;
   portalBtn.onclick = portal;
   logoutBtn.onclick = logout
 }
