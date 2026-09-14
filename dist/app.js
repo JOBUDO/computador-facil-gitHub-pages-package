@@ -1,5 +1,5 @@
 const URL = "https://nhmzuqhjhkdklezimmll.supabase.co",
-  KEY = "sb_publishable_kPQkmWNskYEF979I7d6jUg__XIBQErT",
+  KEY = "sb_publishable_8Mna1mVDvCrbwsJkSvofWg_pY8pelK7",
   FN = URL + "/functions/v1",
   SK = "computador-facil-session",
   BASE = location.origin + location.pathname;
