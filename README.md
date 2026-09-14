@@ -19,10 +19,11 @@ Give the deployer these documents in order:
 ## Repository layout
 
 ```text
-dist/                         Published static website
+site/                         Editable static website source
   index.html                  Single-page app shell
   app.js                      Browser app and public Supabase configuration
   styles.css, auth.css        Styling
+dist/                         Generated Pages artifact (ignored by Git)
 .github/workflows/            GitHub Pages deployment workflow
 ```
 
@@ -30,7 +31,7 @@ dist/                         Published static website
 
 GitHub Pages is intentionally only the website host. Never add Stripe secret/restricted keys, Stripe webhook signing secrets, or Supabase service-role keys to this repository, GitHub Pages settings, browser JavaScript or a `CNAME` file.
 
-The visible `sb_publishable_...` key in `dist/app.js` is designed to be public. It is not a Stripe secret and must be protected by the database Row Level Security policies described in the backend handover.
+The visible `sb_publishable_...` key in `site/app.js` is designed to be public. It is not a Stripe secret and must be protected by the database Row Level Security policies described in the backend handover.
 
 ## Commercial offer
 
