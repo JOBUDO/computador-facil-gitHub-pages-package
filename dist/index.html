@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2948ff" />
+  <meta name="description" content="Aprenda a usar o computador em português, com conta protegida, aulas práticas e progresso pessoal." />
+  <title>Computador Fácil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="auth.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="brand" data-view="home" aria-label="Ir ao início"><span class="brand-mark">C</span><span>Computador<br><strong>Fácil</strong></span></button>
+      <button class="avatar" data-view="profile" aria-label="Abrir perfil"><span id="avatarInitial">A</span><i></i></button>
+    </header>
+
+    <main id="app" tabindex="-1"></main>
+
+    <nav class="bottom-nav" aria-label="Navegação principal">
+      <button data-view="home" class="active"><span>⌂</span>Início</button>
+      <button data-view="courses"><span>▤</span>Aulas</button>
+      <button data-view="helper"><span>✦</span>Ajuda</button>
+      <button data-view="profile"><span>◉</span>Perfil</button>
+    </nav>
+  </div>
+
+  <div class="modal-backdrop hidden" id="onboarding">
+    <section class="modal" aria-modal="true" role="dialog" aria-labelledby="welcomeTitle">
+      <div class="welcome-art"><span>⌨</span><span>☝</span><span>✓</span></div>
+      <p class="eyebrow">BEM-VINDO(A)</p>
+      <h1 id="welcomeTitle">Vamos aprender juntos?</h1>
+      <p>Criaremos um plano simples, baseado no que precisas de aprender.</p>
+      <label>Como te chamas?<input id="nameInput" autocomplete="name" placeholder="Escreve o teu nome" /></label>
+      <fieldset><legend>O que queres aprender primeiro?</legend>
+        <div class="choice-grid">
+          <button class="choice selected" data-goal="Começar do zero">🌱<span>Começar do zero</span></button>
+          <button class="choice" data-goal="Internet e email">🌐<span>Internet e email</span></button>
+          <button class="choice" data-goal="Trabalho e documentos">💼<span>Trabalho e documentos</span></button>
+          <button class="choice" data-goal="Segurança online">🔒<span>Segurança online</span></button>
+        </div>
+      </fieldset>
+      <button class="primary full" id="startBtn">Criar o meu plano <span>→</span></button>
+      <p class="privacy">🔐 O teu progresso fica protegido na tua conta.</p>
+    </section>
+  </div>
+
+  <div class="auth-gate" id="authGate">
+    <section class="auth-panel" aria-labelledby="authTitle">
+      <div class="auth-brand"><span class="brand-mark">C</span><span>Computador <strong>Fácil</strong></span></div>
+      <p class="eyebrow">APRENDE AO TEU RITMO</p>
+      <h1 id="authTitle">O computador pode ser simples.</h1>
+      <p class="auth-intro">Aulas práticas em português, explicadas passo a passo e sem palavras complicadas.</p>
+      <div class="auth-tabs" role="tablist"><button class="active" id="loginTab" type="button">Entrar</button><button id="signupTab" type="button">Criar conta</button></div>
+      <form id="authForm">
+        <label class="signup-only hidden">O teu nome<input id="authName" autocomplete="name" placeholder="Nome completo"></label>
+        <label>Email<input id="authEmail" type="email" autocomplete="email" placeholder="nome@exemplo.com" required></label>
+        <label>Palavra-passe<input id="authPassword" type="password" autocomplete="current-password" minlength="8" placeholder="Mínimo de 8 caracteres" required></label>
+        <p id="authMessage" class="form-message" role="status"></p>
+        <button class="primary full" type="submit"><span id="authSubmitText">Entrar</span><span>→</span></button>
+      </form>
+      <button class="text-button" id="forgotPassword" type="button">Esqueci-me da palavra-passe</button>
+      <p class="auth-legal">Ao criar uma conta, concordas com os termos do serviço e a política de privacidade.</p>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
