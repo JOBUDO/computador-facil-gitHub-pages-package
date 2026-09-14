@@ -237,6 +237,7 @@ main {
 }
 
 .progress-track {
+  display: block;
   height: 7px;
   background: #e9ecf5;
   border-radius: 99px;
@@ -245,6 +246,7 @@ main {
 }
 
 .progress-bar {
+  display: block;
   height: 100%;
   background: linear-gradient(90deg, var(--cyan), var(--blue));
   border-radius: 99px
@@ -373,6 +375,8 @@ main {
 }
 
 .play {
+  display: grid;
+  place-items: center;
   width: 66px;
   height: 66px;
   border: 0;

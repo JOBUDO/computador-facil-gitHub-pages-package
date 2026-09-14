@@ -1,294 +1,298 @@
-const URL = "https://nhmzuqhjhkdklezimmll.supabase.co",
-  KEY = "sb_publishable_8Mna1mVDvCrbwsJkSvofWg_pY8pelK7",
-  FN = URL + "/functions/v1",
-  SK = "computador-facil-session",
-  BASE = location.origin + location.pathname;
-let session = JSON.parse(localStorage.getItem(SK) || "null"),
-  user = session?.user,
-  profile, sub, lessons = [],
-  done = [],
-  mode = "login";
-const app = document.querySelector("#app"),
-  gate = document.querySelector("#authGate");
-const headers = () => ({
-  apikey: KEY,
-  Authorization: "Bearer " + session.access_token,
-  "Content-Type": "application/json"
-});
-async function api(path, opt = {}) {
-  const r = await fetch(URL + path, {
-    ...opt,
-    headers: {
-      ...headers(),
-      ...opt.headers
-    }
-  });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Pedido falhou");
-  return r.status === 204 ? null : r.json()
-}
-const access = () => sub && ["trialing", "active"].includes(sub.status) && new Date(sub.access_ends_at) > new Date();
-const first = () => (profile?.full_name || user?.email?.split("@")[0] || "Amigo").trim().split(/\s+/)[0];
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;"
-}[c]));
-const pct = () => lessons.length ? Math.round(done.length / lessons.length * 100) : 0;
+import { firstName, hasAccess, progress } from "./model.js";
+import { accountView, coursesView, helperView, homeView, lessonView, noticeView, paywallView, show } from "./views.js";
 
-function msg(t, ok = false) {
-  const e = document.querySelector("#authMessage");
-  e.textContent = t;
-  e.classList.toggle("success", ok)
-}
+const URL = "https://nhmzuqhjhkdklezimmll.supabase.co";
+const KEY = "sb_publishable_8Mna1mVDvCrbwsJkSvofWg_pY8pelK7";
+const FUNCTIONS = `${URL}/functions/v1`;
+const SESSION_KEY = "computador-facil-session";
+const BASE = location.origin + location.pathname;
 
-function authMode(m) {
-  mode = m;
-  loginTab.classList.toggle("active", m === "login");
-  signupTab.classList.toggle("active", m === "signup");
-  document.querySelector(".signup-only").classList.toggle("hidden", m !== "signup");
-  forgotPassword.classList.toggle("hidden", m !== "login");
-  authSubmitText.textContent = m === "login" ? "Entrar" : "Criar a minha conta";
-  msg("")
-}
-loginTab.onclick = () => authMode("login");
-signupTab.onclick = () => authMode("signup");
-authForm.onsubmit = async e => {
-  e.preventDefault();
-  msg("A processar…", true);
-  const email = authEmail.value.trim(),
-    password = authPassword.value,
-    name = authName.value.trim();
+function savedSession() {
   try {
-    let r;
-    if (mode === "signup") {
-      if (!name) return msg("Escreve o teu nome.");
-      r = await fetch(URL + "/auth/v1/signup?redirect_to=" + encodeURIComponent(BASE), {
-        method: "POST",
-        headers: {
-          apikey: KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          data: {
-            full_name: name
-          }
-        })
-      })
-    } else r = await fetch(URL + "/auth/v1/token?grant_type=password", {
-      method: "POST",
-      headers: {
-        apikey: KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email,
-        password
-      })
-    });
-    const d = await r.json();
-    if (!r.ok) throw Error(d.error_description || d.msg || d.message);
-    if (!d.access_token) return msg("Conta criada. Confirma o email que enviámos.", true);
-    session = d;
-    user = d.user;
-    localStorage.setItem(SK, JSON.stringify(d));
-    start()
-  } catch (x) {
-    msg(x.message || "Não foi possível entrar.")
+    return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
   }
-};
-forgotPassword.onclick = async () => {
-  const email = authEmail.value.trim();
-  if (!email) return msg("Escreve primeiro o teu email.");
-  const r = await fetch(URL + "/auth/v1/recover?redirect_to=" + encodeURIComponent(BASE), {
-    method: "POST",
-    headers: {
-      apikey: KEY,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      email
-    })
-  });
-  msg(r.ok ? "Enviámos as instruções para o teu email." : "Não foi possível enviar agora.", r.ok)
-};
-googleBtn.onclick = () => location.href = URL + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(BASE);
-async function oauthRedirect() {
-  const h = new URLSearchParams(location.hash.slice(1));
-  const at = h.get("access_token");
-  if (!at) return false;
-  history.replaceState(null, "", location.pathname + location.search);
-  const u = await (await fetch(URL + "/auth/v1/user", {
-    headers: {
-      apikey: KEY,
-      Authorization: "Bearer " + at
-    }
-  })).json();
-  session = {
-    access_token: at,
-    refresh_token: h.get("refresh_token"),
-    expires_in: +h.get("expires_in"),
-    token_type: h.get("token_type"),
-    user: u
-  };
-  user = u;
-  localStorage.setItem(SK, JSON.stringify(session));
-  return true
 }
-async function load() {
-  let p = await api("/rest/v1/profiles?select=*&id=eq." + user.id);
-  if (!p.length) {
-    const n = user.user_metadata?.full_name || user.email.split("@")[0];
+
+const state = {
+  session: savedSession(),
+  user: null,
+  profile: null,
+  subscription: null,
+  lessons: [],
+  done: [],
+  mode: "login"
+};
+state.user = state.session?.user || null;
+
+const dom = {
+  app: document.querySelector("#app"),
+  gate: document.querySelector("#authGate"),
+  nav: document.querySelector(".bottom-nav"),
+  avatarInitial: document.querySelector("#avatarInitial"),
+  authMessage: document.querySelector("#authMessage"),
+  loginTab: document.querySelector("#loginTab"),
+  signupTab: document.querySelector("#signupTab"),
+  signupOnly: document.querySelector(".signup-only"),
+  forgotPassword: document.querySelector("#forgotPassword"),
+  authSubmitText: document.querySelector("#authSubmitText"),
+  authForm: document.querySelector("#authForm"),
+  authEmail: /** @type {HTMLInputElement} */ (document.querySelector("#authEmail")),
+  authPassword: /** @type {HTMLInputElement} */ (document.querySelector("#authPassword")),
+  authName: /** @type {HTMLInputElement} */ (document.querySelector("#authName")),
+  googleButton: document.querySelector("#googleBtn")
+};
+
+function headers() {
+  return {
+    apikey: KEY,
+    ...(state.session?.access_token ? { Authorization: `Bearer ${state.session.access_token}` } : {}),
+    "Content-Type": "application/json"
+  };
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(URL + path, {
+    ...options,
+    headers: { ...headers(), ...options.headers }
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Pedido falhou");
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+function access() {
+  return hasAccess(state.subscription);
+}
+
+function message(text, success = false) {
+  dom.authMessage.textContent = text;
+  dom.authMessage.classList.toggle("success", success);
+}
+
+function authMode(mode) {
+  state.mode = mode;
+  dom.loginTab.classList.toggle("active", mode === "login");
+  dom.signupTab.classList.toggle("active", mode === "signup");
+  dom.signupOnly.classList.toggle("hidden", mode !== "signup");
+  dom.forgotPassword.classList.toggle("hidden", mode !== "login");
+  dom.authSubmitText.textContent = mode === "login" ? "Entrar" : "Criar a minha conta";
+  message("");
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  message("A processar…", true);
+  const email = dom.authEmail.value.trim();
+  const password = dom.authPassword.value;
+  const name = dom.authName.value.trim();
+  try {
+    if (state.mode === "signup" && !name) return message("Escreve o teu nome.");
+    const signup = state.mode === "signup";
+    const path = signup
+      ? `/auth/v1/signup?redirect_to=${encodeURIComponent(BASE)}`
+      : "/auth/v1/token?grant_type=password";
+    const payload = signup ? { email, password, data: { full_name: name } } : { email, password };
+    const response = await fetch(URL + path, {
+      method: "POST",
+      headers: { apikey: KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error_description || data.msg || data.message);
+    if (!data.access_token) return message("Conta criada. Confirma o email que enviámos.", true);
+    state.session = data;
+    state.user = data.user;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+    await start();
+  } catch (error) {
+    message(error.message || "Não foi possível entrar.");
+  }
+}
+
+async function recoverPassword() {
+  const email = dom.authEmail.value.trim();
+  if (!email) return message("Escreve primeiro o teu email.");
+  try {
+    const response = await fetch(`${URL}/auth/v1/recover?redirect_to=${encodeURIComponent(BASE)}`, {
+      method: "POST",
+      headers: { apikey: KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    message(response.ok ? "Enviámos as instruções para o teu email." : "Não foi possível enviar agora.", response.ok);
+  } catch {
+    message("Não foi possível enviar agora.");
+  }
+}
+
+async function oauthRedirect() {
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  const accessToken = fragment.get("access_token");
+  if (!accessToken) return false;
+  history.replaceState(null, "", location.pathname + location.search);
+  const response = await fetch(`${URL}/auth/v1/user`, {
+    headers: { apikey: KEY, Authorization: `Bearer ${accessToken}` }
+  });
+  if (!response.ok) throw new Error("Não foi possível concluir a autenticação.");
+  const user = await response.json();
+  state.session = {
+    access_token: accessToken,
+    refresh_token: fragment.get("refresh_token"),
+    expires_in: Number(fragment.get("expires_in")),
+    token_type: fragment.get("token_type"),
+    user
+  };
+  state.user = user;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(state.session));
+  return true;
+}
+
+async function loadAccount() {
+  const userId = encodeURIComponent(state.user.id);
+  const profiles = await api(`/rest/v1/profiles?select=*&id=eq.${userId}`);
+  if (!profiles.length) {
+    const name = state.user.user_metadata?.full_name || state.user.email.split("@")[0];
     await api("/rest/v1/profiles", {
       method: "POST",
-      headers: {
-        Prefer: "return=minimal"
-      },
-      body: JSON.stringify({
-        id: user.id,
-        full_name: n
-      })
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ id: state.user.id, full_name: name })
     });
-    profile = {
-      id: user.id,
-      full_name: n,
-      learning_goal: "Começar do zero"
-    }
-  } else profile = p[0];
-  const s = await api("/rest/v1/subscriptions?select=*&user_id=eq." + user.id);
-  sub = s[0] || null;
+    state.profile = { id: state.user.id, full_name: name, learning_goal: "Começar do zero" };
+  } else {
+    state.profile = profiles[0];
+  }
+  const subscriptions = await api(`/rest/v1/subscriptions?select=*&user_id=eq.${userId}`);
+  state.subscription = subscriptions[0] || null;
+  state.lessons = [];
+  state.done = [];
   if (access()) {
-    lessons = await api("/rest/v1/lessons?select=*&published=eq.true&order=sort_order.asc");
-    done = (await api("/rest/v1/lesson_progress?select=lesson_id&user_id=eq." + user.id)).map(x => x.lesson_id)
+    state.lessons = await api("/rest/v1/lessons?select=*&published=eq.true&order=sort_order.asc");
+    state.done = (await api(`/rest/v1/lesson_progress?select=lesson_id&user_id=eq.${userId}`))
+      .map(item => item.lesson_id);
   }
 }
 
-function bind() {
-  document.querySelectorAll("[data-view]").forEach(b => b.onclick = () => render(b.dataset.view));
-  document.querySelectorAll("[data-lesson]").forEach(b => b.onclick = () => lesson(+b.dataset.lesson))
-}
-
-function render(v = "home") {
-  if (!access()) return paywall();
-  document.querySelectorAll(".bottom-nav button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
-  avatarInitial.textContent = first()[0].toUpperCase();
-  if (v === "home") home();
-  if (v === "courses") courses();
-  if (v === "helper") helper();
-  if (v === "profile") account();
-  bind();
-  scrollTo({
-    top: 0,
-    behavior: "smooth"
-  })
-}
-
-function paywall() {
-  document.querySelector(".bottom-nav").classList.add("hidden");
-  app.innerHTML = `<header class="page-heading"><p class="eyebrow">CONTA CRIADA</p><h1>Desbloqueia a tua aprendizagem</h1><p>Olá, ${esc(first())}. O teu plano está pronto.</p></header><section class="paywall"><span class="status-pill">4 DIAS DE ACESSO COMPLETO</span><div class="paywall-price">£5 <small>pagamento inicial</small></div><ul class="paywall-list"><li>Todas as aulas em português</li><li>Exercícios práticos passo a passo</li><li>Progresso guardado na tua conta</li><li>Assistente de aprendizagem Lia</li></ul><button class="primary full" id="checkoutBtn">Começar por £5 <span>→</span></button><p class="billing-note">Hoje pagas £5. Após quatro dias, a assinatura continua por £15.99 por mês até cancelares.</p><p id="checkoutMessage" class="form-message"></p></section><button class="text-button" id="logoutBtn">Sair desta conta</button>`;
-  checkoutBtn.onclick = checkout;
-  logoutBtn.onclick = logout
-}
-async function checkout() {
-  checkoutBtn.disabled = true;
-  checkoutBtn.textContent = "A abrir pagamento…";
-  try {
-    const r = await fetch(FN + "/create-checkout", {
-        method: "POST",
-        headers: headers()
-      }),
-      d = await r.json();
-    if (!r.ok) throw Error(d.error);
-    location.href = d.url
-  } catch (x) {
-    checkoutMessage.textContent = x.message;
-    checkoutBtn.disabled = false;
-    checkoutBtn.textContent = "Tentar novamente"
+function render(view = "home") {
+  if (!access()) {
+    dom.nav.classList.add("hidden");
+    show(dom.app, ...paywallView(firstName(state.profile, state.user), {
+      onCheckout: checkout,
+      onLogout: logout
+    }));
+    return;
   }
-}
-
-function home() {
-  const n = lessons.find(x => !done.includes(x.id)) || lessons[0];
-  app.innerHTML = `<section class="hero"><p class="eyebrow">O TEU PLANO PERSONALIZADO</p><h1>Olá, ${esc(first())}! 👋</h1><p>Hoje basta uma pequena conquista. Continua ao teu ritmo.</p><span class="streak">✓ Acesso ativo</span></section><div class="section-title"><h2>Continua a aprender</h2><button data-view="courses">Ver todas</button></div><button class="continue-card" data-lesson="${n.id}"><span class="lesson-icon">${n.icon}</span><span><h3>${n.title}</h3><p>${n.duration_minutes} min · ${n.level}</p><span class="progress-track"><span class="progress-bar" style="display:block;width:${pct()}%"></span></span></span><span class="round-arrow">→</span></button><div class="section-title"><h2>O teu progresso</h2></div><div class="profile-card"><div class="stats"><div class="stat"><strong>${done.length}</strong><span>AULAS</span></div><div class="stat"><strong>${pct()}%</strong><span>PROGRESSO</span></div><div class="stat"><strong>${lessons.length}</strong><span>TOTAL</span></div></div></div>`
-}
-
-function courses() {
-  app.innerHTML = `<header class="page-heading"><p class="eyebrow">A TUA JORNADA</p><h1>Aulas práticas</h1><p>${done.length} de ${lessons.length} concluídas · ${pct()}%</p><div class="progress-track"><div class="progress-bar" style="width:${pct()}%"></div></div></header><div class="section-title"><h2>Plano: ${profile.learning_goal}</h2></div>${lessons.map((l,i)=>`<button class="course-card" data-lesson="${l.id}"><span class="lesson-icon">${done.includes(l.id)?"✓":l.icon}</span><span><h3>${i+1}. ${l.title}</h3><p>${l.description}</p><span class="tag">${l.duration_minutes} min · ${l.level}</span></span><span>${done.includes(l.id)?"✅":"›"}</span></button>`).join("")}`
-}
-
-function lesson(id) {
-  const l = lessons.find(x => x.id === id);
-  app.innerHTML = `<div class="lesson-top"><button class="back" data-view="courses">‹</button><div><p class="eyebrow">LIÇÃO ${l.sort_order} DE ${lessons.length}</p><h1>${l.title}</h1></div></div><div class="video-card"><div><button class="play">▶</button><p>Demonstração guiada · ${l.duration_minutes} min</p></div></div><div class="instruction"><h3>Como aprender</h3><div class="step"><b>1</b><span>Vê a demonstração devagar e pausa quando precisares.</span></div><div class="step"><b>2</b><span>Repete cada ação no teu computador.</span></div></div><div class="instruction"><h3>Missão prática</h3><p>${l.mission}</p><button class="primary full" id="completeBtn">${done.includes(id)?"Concluída ✓":"Marcar como concluída"} <span>→</span></button></div>`;
-  completeBtn.onclick = async () => {
-    if (!done.includes(id)) {
-      await api("/rest/v1/lesson_progress", {
-        method: "POST",
-        headers: {
-          Prefer: "return=minimal"
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          lesson_id: id
-        })
-      });
-      done.push(id);
-      courses();
-      bind()
-    }
+  dom.nav.classList.remove("hidden");
+  dom.nav.querySelectorAll("button").forEach(item =>
+    item.classList.toggle("active", item.dataset.view === view));
+  dom.avatarInitial.textContent = firstName(state.profile, state.user)[0].toUpperCase();
+  const context = {
+    first: firstName(state.profile, state.user),
+    profile: state.profile,
+    user: state.user,
+    subscription: state.subscription,
+    lessons: state.lessons,
+    done: state.done,
+    percent: progress(state.done, state.lessons)
   };
-  bind()
+  const handlers = { onView: render, onLesson: openLesson, onPortal: portal, onLogout: logout };
+  if (view === "home") show(dom.app, ...homeView(context, handlers));
+  else if (view === "courses") show(dom.app, ...coursesView(context, handlers));
+  else if (view === "helper") show(dom.app, ...helperView());
+  else if (view === "profile") show(dom.app, ...accountView(context, handlers));
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function helper() {
-  app.innerHTML = `<div class="helper-card"><div class="helper-orb"></div><h2>Olá, sou a Lia</h2><p>Explico cada passo em português simples, sem pressa.</p></div><div class="section-title"><h2>Como posso ajudar?</h2></div><div id="answerArea"></div><div class="quick-questions"><button data-q="Para copiar, seleciona o texto e usa Ctrl + C. Para colar, usa Ctrl + V.">📋 Como copiar e colar?</button><button data-q="Clica com o botão direito, escolhe Novo e depois Pasta.">📁 Como criar uma pasta?</button><button data-q="Confirma o remetente e desconfia de urgência, dinheiro ou pedidos de palavra-passe.">🛡️ Como reconhecer um email falso?</button></div>`;
-  document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => answerArea.innerHTML = `<div class="answer"><strong>Lia:</strong><br>${b.dataset.q}</div>`)
+function openLesson(id) {
+  const lesson = state.lessons.find(item => item.id === id);
+  if (!lesson) return render("courses");
+  show(dom.app, ...lessonView(lesson, state.lessons.length, state.done.includes(id), {
+    onBack: () => render("courses"),
+    onComplete: async () => {
+      if (state.done.includes(id)) return;
+      try {
+        await api("/rest/v1/lesson_progress", {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ user_id: state.user.id, lesson_id: id })
+        });
+        state.done.push(id);
+        render("courses");
+      } catch (error) {
+        dom.app.querySelector(".form-message").textContent = error.message || "Não foi possível guardar o progresso.";
+      }
+    }
+  }));
 }
 
-function account() {
-  const end = new Date(sub.access_ends_at).toLocaleDateString("pt-PT");
-  app.innerHTML = `<header class="page-heading"><p class="eyebrow">O TEU ESPAÇO</p><h1>Perfil</h1></header><section class="profile-card"><div class="large-avatar">${esc(first()[0].toUpperCase())}</div><h2>${esc(profile.full_name)}</h2><p>${esc(user.email)}</p><span class="status-pill">ACESSO ATÉ ${end}</span></section><div class="settings"><button id="portalBtn">Gerir assinatura e pagamentos <span>›</span></button><button id="logoutBtn">Terminar sessão <span>›</span></button></div><p id="portalMessage" class="form-message"></p>`;
-  portalBtn.onclick = portal;
-  logoutBtn.onclick = logout
-}
-async function portal() {
+async function checkout(button, output) {
+  button.disabled = true;
+  button.textContent = "A abrir pagamento…";
   try {
-    const r = await fetch(FN + "/customer-portal", {
-        method: "POST",
-        headers: headers()
-      }),
-      d = await r.json();
-    if (!r.ok) throw Error(d.error);
-    location.href = d.url
-  } catch (x) {
-    portalMessage.textContent = x.message
+    const response = await fetch(`${FUNCTIONS}/create-checkout`, { method: "POST", headers: headers() });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    location.href = data.url;
+  } catch (error) {
+    output.textContent = error.message || "Não foi possível abrir o pagamento.";
+    button.disabled = false;
+    button.textContent = "Tentar novamente";
   }
 }
+
+async function portal(output) {
+  try {
+    const response = await fetch(`${FUNCTIONS}/customer-portal`, { method: "POST", headers: headers() });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    location.href = data.url;
+  } catch (error) {
+    output.textContent = error.message || "Não foi possível abrir o portal.";
+  }
+}
+
 async function logout() {
-  if (session) await fetch(URL + "/auth/v1/logout", {
-    method: "POST",
-    headers: headers()
-  }).catch(() => {});
-  localStorage.removeItem(SK);
-  location.reload()
+  if (state.session) {
+    await fetch(`${URL}/auth/v1/logout`, { method: "POST", headers: headers() }).catch(() => {});
+  }
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
 }
+
 async function start() {
-  gate.classList.add("hidden");
+  dom.gate.classList.add("hidden");
   try {
-    await load();
-    document.querySelector(".bottom-nav").classList.toggle("hidden", !access());
+    await loadAccount();
+    dom.nav.classList.toggle("hidden", !access());
     if (new URLSearchParams(location.search).get("checkout") === "success") {
-      app.innerHTML = '<div class="instruction"><h3>Pagamento recebido</h3><p>Estamos a confirmar o teu acesso. A página atualizará dentro de instantes.</p></div>';
-      setTimeout(() => location.href = BASE, 4000)
-    } else render("home")
-  } catch (x) {
-    app.innerHTML = `<div class="instruction"><h3>Não foi possível carregar a conta</h3><p>${x.message}</p></div>`
+      show(dom.app, noticeView("Pagamento recebido", "Estamos a confirmar o teu acesso. A página atualizará dentro de instantes."));
+      setTimeout(() => { location.href = BASE; }, 4000);
+    } else {
+      render("home");
+    }
+  } catch (error) {
+    dom.nav.classList.add("hidden");
+    show(dom.app, noticeView("Não foi possível carregar a conta", error.message || "Tenta novamente mais tarde."));
   }
 }
-document.querySelectorAll("[data-view]").forEach(b => b.onclick = () => render(b.dataset.view));
-(async () => {
-  if (await oauthRedirect()) return start();
-  session?.access_token ? start() : gate.classList.remove("hidden")
-})();
+
+dom.loginTab.addEventListener("click", () => authMode("login"));
+dom.signupTab.addEventListener("click", () => authMode("signup"));
+dom.authForm.addEventListener("submit", submitAuth);
+dom.forgotPassword.addEventListener("click", recoverPassword);
+dom.googleButton.addEventListener("click", () => {
+  location.href = `${URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(BASE)}`;
+});
+document.querySelectorAll("[data-view]").forEach(item =>
+  item.addEventListener("click", () => render(item.getAttribute("data-view") || "home")));
+
+try {
+  if (await oauthRedirect() || state.session?.access_token) await start();
+  else dom.gate.classList.remove("hidden");
+} catch (error) {
+  dom.gate.classList.remove("hidden");
+  message(error.message || "Não foi possível entrar.");
+}
