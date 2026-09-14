@@ -16,6 +16,7 @@ Do not replace this public configuration unless moving to a new Supabase project
 ### Authentication
 
 - Email/password provider enabled.
+- Google OAuth provider enabled (Authentication → Providers → Google), using a Google Cloud OAuth Client ID/Secret with authorized redirect URI `https://nhmzuqhjhkdklezimmll.supabase.co/auth/v1/callback`. The frontend redirects the browser to `/auth/v1/authorize?provider=google&redirect_to=<site origin>` and reads the returned access token from the URL fragment on return — no additional frontend secret is needed.
 - Confirm-email enabled.
 - Final custom domain configured as the Site URL and allowed redirect URL.
 - Password recovery redirects to the same final custom domain.
