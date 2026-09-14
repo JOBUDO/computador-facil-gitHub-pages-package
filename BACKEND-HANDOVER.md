@@ -2,7 +2,7 @@
 
 ## Existing production backend
 
-The static site is already connected to one production Supabase project. The public client configuration lives in `dist/app.js`:
+The static site is already connected to one production Supabase project. The public client configuration lives in `site/app.js`:
 
 - Supabase URL: `https://nhmzuqhjhkdklezimmll.supabase.co`
 - A Supabase **publishable** key: intentionally visible in browser code

@@ -21,13 +21,13 @@ Choose the final domain before deployment, for example `app.example.com`. This g
 4. In GitHub, open **Settings → Pages → Build and deployment** and select **GitHub Actions** as the source.
 5. Open the **Actions** tab and allow the `Deploy static site to GitHub Pages` workflow to finish successfully.
 
-The workflow publishes exactly the `dist/` folder. A new push to `main` deploys a new version.
+The workflow copies the editable `site/` folder into a generated `dist/` artifact and publishes it. A new push to `main` deploys a new version. Edit `site/`; do not commit `dist/`.
 
 ## 2. Set the GitHub Pages custom domain
 
 1. In **Settings → Pages**, enter the final domain under **Custom domain** and save it.
 2. In the same screen, enable **Enforce HTTPS** once GitHub reports that the certificate is ready.
-3. Create a file named `dist/CNAME` containing exactly the final domain, for example:
+3. Create a file named `site/CNAME` containing exactly the final domain, for example:
 
    ```text
    app.example.com

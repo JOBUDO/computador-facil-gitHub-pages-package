@@ -18,7 +18,7 @@ flowchart TD
 
 | Component | Responsibility | Must remain private? |
 |---|---|---|
-| GitHub Pages | `dist/` static website | No |
+| GitHub Pages | Generated `dist/` copy of the `site/` static website | No |
 | Cloudflare | Domain DNS, HTTPS and optional WAF/rate limiting | Account access only |
 | Supabase Auth | Registration, confirmation and password recovery | Project administration only |
 | Supabase Postgres | Learner profile, progress, lessons and access entitlement | Direct data access protected by RLS |
