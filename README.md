@@ -24,6 +24,8 @@ site/                         Editable static website source
   app.js                      Browser app and public Supabase configuration
   styles.css, auth.css        Styling
 dist/                         Generated Pages artifact (ignored by Git)
+supabase/migrations/          SQL applied to the production Supabase project (history/review only —
+                               this repo does not run the Supabase CLI locally)
 .github/workflows/            GitHub Pages deployment workflow
 ```
 
