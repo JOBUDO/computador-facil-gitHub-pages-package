@@ -1,13 +1,32 @@
 :root {
-  --ink: #16213e;
-  --muted: #6c7590;
-  --blue: #2948ff;
-  --cyan: #19c7cf;
-  --cream: #f8f7f2;
-  --card: #fff;
-  --line: #e8eaf1;
-  --green: #34b77a;
-  --shadow: 0 16px 40px rgba(31, 45, 92, .10)
+  --bg: #0b0c12;
+  --bg-elevated: #14151f;
+  --ink: #f3f4fa;
+  --muted: #9aa0bd;
+  --blue: #6d8bff;
+  --blue-deep: #3049e8;
+  --violet: #6647d6;
+  --cyan: #37e6d0;
+  --green: #34d399;
+  --yellow: #ffce54;
+  --pink: #ff6fa5;
+  --purple: #9b7bff;
+  --orange: #ff8a5c;
+  --card: #171927;
+  --card-soft: rgba(255, 255, 255, .04);
+  --line: rgba(255, 255, 255, .09);
+  --shadow: 0 24px 60px rgba(0, 0, 0, .55);
+  --shadow-sm: 0 10px 26px rgba(0, 0, 0, .35);
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-pill: 999px;
+  --grad-primary: linear-gradient(135deg, var(--blue-deep), var(--violet));
+  --grad-hero: linear-gradient(140deg, #1f1747, #35297f 55%, #4a3fc4);
+  --grad-1: linear-gradient(135deg, #8b5cf6, #ec4899);
+  --grad-2: linear-gradient(135deg, #fb923c, #f43f5e);
+  --grad-3: linear-gradient(135deg, #34d399, #06b6d4);
+  --grad-4: linear-gradient(135deg, #fbbf24, #f472b6)
 }
 
 * {
@@ -16,7 +35,11 @@
 
 body {
   margin: 0;
-  background: linear-gradient(145deg, #eef2ff 0%, #fbfaf6 48%, #eafafa 100%);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(52, 211, 153, .16), transparent 45%),
+    radial-gradient(circle at 88% 12%, rgba(155, 123, 255, .18), transparent 45%),
+    radial-gradient(circle at 78% 92%, rgba(255, 206, 84, .12), transparent 42%),
+    var(--bg);
   color: var(--ink);
   font-family: "DM Sans", sans-serif;
   min-height: 100vh
@@ -27,10 +50,10 @@ body {
   max-width: 480px;
   min-height: 100vh;
   margin: auto;
-  background: var(--cream);
+  background: var(--bg-elevated);
   position: relative;
-  padding-bottom: 94px;
-  box-shadow: 0 0 70px rgba(30, 46, 95, .12)
+  padding-bottom: 104px;
+  box-shadow: var(--shadow)
 }
 
 button,
@@ -44,7 +67,7 @@ input {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(248, 247, 242, .9);
+  background: rgba(20, 21, 31, .82);
   backdrop-filter: blur(14px);
   position: sticky;
   top: 0;
@@ -74,9 +97,9 @@ input {
   display: grid;
   place-items: center;
   border-radius: 13px;
-  background: var(--blue);
+  background: var(--grad-primary);
   color: #fff;
-  font-family: Manrope;
+  font-family: Manrope, "DM Sans", sans-serif;
   font-size: 23px;
   font-weight: 800;
   transform: rotate(-5deg)
@@ -87,7 +110,7 @@ input {
   height: 43px;
   border: 0;
   border-radius: 50%;
-  background: #dfe5ff;
+  background: rgba(109, 139, 255, .16);
   color: var(--blue);
   font-weight: 800;
   position: relative;
@@ -98,7 +121,7 @@ input {
   position: absolute;
   width: 11px;
   height: 11px;
-  border: 2px solid var(--cream);
+  border: 2px solid var(--bg-elevated);
   background: var(--green);
   border-radius: 50%;
   right: 0;
@@ -110,13 +133,13 @@ main {
 }
 
 .hero {
-  background: linear-gradient(140deg, #213ee5, #3859ff 62%, #5373ff);
+  background: var(--grad-hero);
   color: #fff;
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   padding: 26px 24px;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--shadow)
+  box-shadow: var(--shadow-sm)
 }
 
 .hero:after {
@@ -124,7 +147,7 @@ main {
   position: absolute;
   width: 150px;
   height: 150px;
-  border: 26px solid rgba(255, 255, 255, .09);
+  border: 26px solid rgba(255, 255, 255, .08);
   border-radius: 50%;
   right: -57px;
   top: -49px
@@ -138,12 +161,8 @@ main {
   margin: 0 0 9px
 }
 
-.hero .eyebrow {
-  color: #9ef5f0
-}
-
 .hero h1 {
-  font: 800 29px/1.05 Manrope;
+  font: 800 29px/1.05 Manrope, "DM Sans", sans-serif;
   margin: 0 0 9px;
   max-width: 310px
 }
@@ -160,9 +179,9 @@ main {
   display: inline-flex;
   gap: 8px;
   align-items: center;
-  background: rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .12);
   padding: 8px 12px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 700
 }
@@ -175,7 +194,7 @@ main {
 }
 
 .section-title h2 {
-  font: 800 19px Manrope;
+  font: 800 19px Manrope, "DM Sans", sans-serif;
   margin: 0
 }
 
@@ -190,13 +209,13 @@ main {
 .continue-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: var(--radius-md);
   padding: 17px;
   display: grid;
   grid-template-columns: 58px 1fr auto;
   gap: 13px;
   align-items: center;
-  box-shadow: 0 8px 28px rgba(36, 51, 96, .06);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   text-align: left;
   width: 100%
@@ -206,16 +225,29 @@ main {
   width: 58px;
   height: 58px;
   border-radius: 17px;
-  background: #fff1cf;
+  background: var(--grad-1);
   display: grid;
   place-items: center;
   font-size: 27px
 }
 
+.lesson-icon.g2 {
+  background: var(--grad-2)
+}
+
+.lesson-icon.g3 {
+  background: var(--grad-3)
+}
+
+.lesson-icon.g4 {
+  background: var(--grad-4)
+}
+
 .continue-card h3,
 .course-card h3 {
   margin: 0 0 5px;
-  font-size: 15px
+  font-size: 15px;
+  color: var(--ink)
 }
 
 .continue-card p,
@@ -231,7 +263,7 @@ main {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--blue);
+  background: var(--grad-primary);
   color: #fff;
   font-size: 18px
 }
@@ -239,8 +271,8 @@ main {
 .progress-track {
   display: block;
   height: 7px;
-  background: #e9ecf5;
-  border-radius: 99px;
+  background: rgba(255, 255, 255, .08);
+  border-radius: var(--radius-pill);
   margin-top: 12px;
   overflow: hidden
 }
@@ -249,7 +281,7 @@ main {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, var(--cyan), var(--blue));
-  border-radius: 99px
+  border-radius: var(--radius-pill)
 }
 
 .skills-grid {
@@ -260,8 +292,8 @@ main {
 
 .skill {
   border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 20px;
+  background: var(--card);
+  border-radius: var(--radius-md);
   padding: 17px 14px;
   text-align: left;
   color: var(--ink);
@@ -285,8 +317,9 @@ main {
 }
 
 .page-heading h1 {
-  font: 800 28px Manrope;
-  margin: 8px 0 6px
+  font: 800 28px Manrope, "DM Sans", sans-serif;
+  margin: 8px 0 6px;
+  color: var(--ink)
 }
 
 .page-heading p {
@@ -296,8 +329,8 @@ main {
 
 .course-card {
   border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 22px;
+  background: var(--card);
+  border-radius: var(--radius-md);
   padding: 15px;
   margin-bottom: 13px;
   display: grid;
@@ -310,7 +343,7 @@ main {
 }
 
 .course-card.locked {
-  opacity: .64
+  opacity: .6
 }
 
 .course-card .lesson-icon {
@@ -323,10 +356,20 @@ main {
   font-size: 10px;
   font-weight: 800;
   color: var(--blue);
-  background: #edf0ff;
+  background: rgba(109, 139, 255, .16);
   padding: 4px 7px;
-  border-radius: 99px;
+  border-radius: var(--radius-pill);
   margin-top: 8px
+}
+
+.tag.tag-beginner {
+  color: var(--green);
+  background: rgba(52, 211, 153, .16)
+}
+
+.tag.tag-intermediate {
+  color: var(--orange);
+  background: rgba(255, 138, 92, .16)
 }
 
 .lesson-top {
@@ -340,20 +383,22 @@ main {
   width: 42px;
   height: 42px;
   border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 13px;
+  background: var(--card);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
   font-size: 20px
 }
 
 .lesson-top h1 {
-  font: 800 20px Manrope;
-  margin: 0
+  font: 800 20px Manrope, "DM Sans", sans-serif;
+  margin: 0;
+  color: var(--ink)
 }
 
 .video-card {
   aspect-ratio: 16/9;
-  border-radius: 24px;
-  background: linear-gradient(145deg, #17204b, #2948ff);
+  border-radius: var(--radius-lg);
+  background: var(--grad-hero);
   color: #fff;
   display: grid;
   place-items: center;
@@ -382,30 +427,31 @@ main {
   border: 0;
   border-radius: 50%;
   background: #fff;
-  color: var(--blue);
+  color: var(--blue-deep);
   font-size: 25px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, .25);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, .35);
   z-index: 1
 }
 
 .instruction {
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: var(--radius-md);
   padding: 18px;
   margin-top: 15px
 }
 
 .instruction h3 {
-  font: 800 16px Manrope;
-  margin: 0 0 12px
+  font: 800 16px Manrope, "DM Sans", sans-serif;
+  margin: 0 0 12px;
+  color: var(--ink)
 }
 
 .step {
   display: flex;
   gap: 13px;
   margin: 12px 0;
-  color: #4f5872;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.4
 }
@@ -414,21 +460,21 @@ main {
   flex: 0 0 27px;
   height: 27px;
   border-radius: 9px;
-  background: #eafafa;
-  color: #078d95;
+  background: rgba(55, 230, 208, .14);
+  color: var(--cyan);
   display: grid;
   place-items: center
 }
 
 .primary {
   border: 0;
-  border-radius: 15px;
-  background: var(--blue);
+  border-radius: var(--radius-sm);
+  background: var(--grad-primary);
   color: #fff;
   padding: 15px 18px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(41, 72, 255, .22)
+  box-shadow: 0 10px 26px rgba(48, 73, 232, .35)
 }
 
 .full {
@@ -439,8 +485,8 @@ main {
 
 .helper-card {
   padding: 25px 20px;
-  background: linear-gradient(145deg, #12203b, #203260);
-  border-radius: 26px;
+  background: var(--grad-hero);
+  border-radius: var(--radius-lg);
   color: #fff;
   text-align: center
 }
@@ -455,7 +501,7 @@ main {
 }
 
 .helper-card h2 {
-  font: 800 22px Manrope;
+  font: 800 22px Manrope, "DM Sans", sans-serif;
   margin: 0
 }
 
@@ -473,8 +519,8 @@ main {
 
 .quick-questions button {
   border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 15px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
   padding: 14px;
   text-align: left;
   color: var(--ink)
@@ -483,7 +529,7 @@ main {
 .chatbox {
   display: flex;
   gap: 8px;
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: 17px;
   padding: 6px
@@ -494,30 +540,33 @@ main {
   outline: 0;
   min-width: 0;
   flex: 1;
-  padding: 9px
+  padding: 9px;
+  background: transparent;
+  color: var(--ink)
 }
 
 .chatbox button {
   border: 0;
-  background: var(--blue);
+  background: var(--grad-primary);
   color: #fff;
   border-radius: 12px;
   width: 42px
 }
 
 .answer {
-  background: #e9fafa;
+  background: rgba(55, 230, 208, .1);
   border-radius: 16px 16px 16px 4px;
   padding: 14px;
   margin: 14px 0;
   font-size: 13px;
-  line-height: 1.5
+  line-height: 1.5;
+  color: var(--ink)
 }
 
 .profile-card {
   text-align: center;
-  background: #fff;
-  border-radius: 24px;
+  background: var(--card);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   padding: 24px
 }
@@ -528,9 +577,9 @@ main {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #e4e9ff;
+  background: rgba(109, 139, 255, .16);
   color: var(--blue);
-  font: 800 30px Manrope;
+  font: 800 30px Manrope, "DM Sans", sans-serif;
   margin: auto
 }
 
@@ -542,14 +591,16 @@ main {
 }
 
 .stat {
-  background: #f5f6fa;
-  border-radius: 14px;
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: 12px 5px
 }
 
 .stat strong {
   display: block;
-  font-size: 19px
+  font: 800 22px Manrope, "DM Sans", sans-serif;
+  color: var(--ink)
 }
 
 .stat span {
@@ -559,8 +610,8 @@ main {
 
 .settings {
   margin-top: 16px;
-  background: #fff;
-  border-radius: 20px;
+  background: var(--card);
+  border-radius: var(--radius-md);
   border: 1px solid var(--line);
   overflow: hidden
 }
@@ -572,7 +623,8 @@ main {
   padding: 16px;
   border: 0;
   border-bottom: 1px solid var(--line);
-  background: #fff;
+  background: var(--card);
+  color: var(--ink);
   text-align: left
 }
 
@@ -582,25 +634,28 @@ main {
 
 .bottom-nav {
   position: fixed;
-  bottom: 0;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  height: 78px;
-  background: rgba(255, 255, 255, .95);
-  backdrop-filter: blur(14px);
-  border-top: 1px solid var(--line);
+  width: calc(100% - 32px);
+  max-width: 448px;
+  height: 72px;
+  background: rgba(20, 21, 31, .92);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   z-index: 10;
-  padding: 7px 8px 10px
+  padding: 6px
 }
 
 .bottom-nav button {
   border: 0;
+  border-radius: var(--radius-pill);
   background: none;
-  color: #8a91a7;
+  color: #767c99;
   font-size: 10px;
   font-weight: 700;
   display: grid;
@@ -615,13 +670,14 @@ main {
 }
 
 .bottom-nav .active {
-  color: var(--blue)
+  color: var(--ink);
+  background: rgba(109, 139, 255, .16)
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 52, .62);
+  background: rgba(3, 4, 8, .72);
   z-index: 50;
   display: grid;
   place-items: end center;
@@ -633,18 +689,20 @@ main {
 }
 
 .modal {
-  background: #fff;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
   width: 100%;
   max-width: 480px;
   max-height: 95vh;
   overflow: auto;
   border-radius: 30px 30px 0 0;
   padding: 27px 22px 22px;
-  text-align: center
+  text-align: center;
+  color: var(--ink)
 }
 
 .modal h1 {
-  font: 800 27px Manrope;
+  font: 800 27px Manrope, "DM Sans", sans-serif;
   margin: 3px
 }
 
@@ -670,11 +728,11 @@ main {
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: #eafafa
+  background: rgba(55, 230, 208, .14)
 }
 
 .welcome-art span:nth-child(2) {
-  background: #edf0ff;
+  background: rgba(109, 139, 255, .14);
   transform: translateY(-8px)
 }
 
@@ -683,12 +741,15 @@ main {
   text-align: left;
   font-size: 12px;
   font-weight: 800;
-  display: block
+  display: block;
+  color: var(--ink)
 }
 
 .modal input {
   width: 100%;
   border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
   border-radius: 14px;
   padding: 14px;
   margin-top: 7px;
@@ -711,7 +772,8 @@ fieldset {
 .choice {
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card);
+  color: var(--ink);
   padding: 12px 8px;
   text-align: left;
   display: flex;
@@ -722,7 +784,7 @@ fieldset {
 
 .choice.selected {
   border-color: var(--blue);
-  background: #f0f2ff;
+  background: rgba(109, 139, 255, .14);
   color: var(--blue)
 }
 
@@ -739,12 +801,11 @@ fieldset {
 
   .app-shell {
     min-height: calc(100vh - 48px);
-    border-radius: 30px;
+    border-radius: var(--radius-lg);
     overflow: hidden
   }
 
   .bottom-nav {
-    bottom: 24px;
-    border-radius: 0 0 30px 30px
+    bottom: 40px
   }
 }

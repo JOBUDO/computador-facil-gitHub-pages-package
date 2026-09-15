@@ -21,6 +21,17 @@ function progressTrack(value) {
   return el("span", "progress-track", bar);
 }
 
+const ICON_GRADIENTS = ["", "g2", "g3", "g4"];
+function iconGradient(index) {
+  return ICON_GRADIENTS[index % ICON_GRADIENTS.length];
+}
+
+function tagVariant(level) {
+  if (level === "Iniciante") return "tag-beginner";
+  if (level === "Intermédio") return "tag-intermediate";
+  return "";
+}
+
 export function show(root, ...children) {
   root.replaceChildren(...children);
 }
@@ -51,8 +62,9 @@ export function homeView({ first, lessons, done, percent }, { onView, onLesson }
     ? button("continue-card", "", () => onLesson(next.id))
     : el("p", "", "As aulas aparecerão aqui em breve.");
   if (next) {
+    const gradient = iconGradient(lessons.indexOf(next));
     continueCard.replaceChildren(
-      el("span", "lesson-icon", next.icon),
+      el("span", `lesson-icon ${gradient}`.trim(), next.icon),
       el("span", "", el("h3", "", next.title),
         el("p", "", `${next.duration_minutes} min · ${next.level}`), progressTrack(percent)),
       el("span", "round-arrow", "→")
@@ -85,10 +97,10 @@ export function coursesView({ profile, lessons, done, percent }, { onLesson }) {
         const card = button("course-card", "", () => onLesson(lesson.id));
         const completed = done.includes(lesson.id);
         card.replaceChildren(
-          el("span", "lesson-icon", completed ? "✓" : lesson.icon),
+          el("span", `lesson-icon ${iconGradient(index)}`.trim(), completed ? "✓" : lesson.icon),
           el("span", "", el("h3", "", `${index + 1}. ${lesson.title}`),
             el("p", "", lesson.description),
-            el("span", "tag", `${lesson.duration_minutes} min · ${lesson.level}`)),
+            el("span", `tag ${tagVariant(lesson.level)}`.trim(), `${lesson.duration_minutes} min · ${lesson.level}`)),
           el("span", "", completed ? "✅" : "›")
         );
         return card;
