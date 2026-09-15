@@ -6,11 +6,14 @@
 flowchart TD
   Learner["Learner's mobile browser"] --> Pages["GitHub Pages\nstatic frontend"]
   Pages --> Auth["Supabase Auth\nemail/password"]
-  Pages --> Data["Supabase Postgres\nprofiles, lessons, progress"]
-  Pages --> Functions["Supabase Edge Functions\ncheckout and customer portal"]
+  Pages --> Data["Supabase Postgres\nprofiles, lessons, progress, mastery"]
+  Pages --> Functions["Supabase Edge Functions\ncheckout, customer portal, ai-tutor"]
   Functions --> Stripe["Stripe Checkout\nand Billing Portal"]
+  Functions --> LLM["External LLM API\n(Anthropic/OpenAI/Gemini)"]
   Stripe --> Webhook["Signed Stripe webhook"]
   Webhook --> Data
+  LLM --> Functions
+  Functions --> Data
   Cloudflare["Cloudflare DNS + SSL"] --> Pages
 ```
 
@@ -22,8 +25,9 @@ flowchart TD
 | Cloudflare | Domain DNS, HTTPS and optional WAF/rate limiting | Account access only |
 | Supabase Auth | Registration, confirmation and password recovery | Project administration only |
 | Supabase Postgres | Learner profile, progress, lessons and access entitlement | Direct data access protected by RLS |
-| Supabase Edge Functions | Create Checkout and Customer Portal sessions; handle webhooks | Yes — has backend secrets |
+| Supabase Edge Functions | Create Checkout and Customer Portal sessions; handle webhooks; run the `ai-tutor` LLM tutor | Yes — has backend secrets |
 | Stripe | Customer, subscription, invoice and payment events | Yes — account and key access |
+| External LLM API | Generates Lia's tutoring replies for `ai-tutor`; never called from the browser | Yes — API key access |
 
 ## Access flow
 

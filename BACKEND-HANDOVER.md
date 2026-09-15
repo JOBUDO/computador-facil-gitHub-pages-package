@@ -55,6 +55,48 @@ existing lessons leave `null`. See `supabase/README.md` for full detail and roll
 | `create-checkout` | Authenticated browser | Creates a Stripe Checkout Session for the named user, attaches `user_id` metadata/client reference and returns only the hosted Checkout URL. |
 | `customer-portal` | Authenticated browser | Creates a Stripe Billing Portal session for the caller's Stripe customer. |
 | `stripe-webhook` | Stripe only | Verifies the `Stripe-Signature`, receives lifecycle events and updates `subscriptions`. |
+| `ai-tutor` | Authenticated browser (Lia chat, Stage 3) | Derives the caller from their JWT, re-checks active entitlement server-side, builds a bounded context (current lesson, mastery, last 5 interactions) and calls the configured LLM provider. See below. |
+
+### `ai-tutor` (AI adaptive learning, Stage 3)
+
+Source lives in this repo under `supabase/functions/ai-tutor/` (`logic.js` is pure and
+unit-tested under Node in `tests/aiTutorLogic.test.js`; `index.ts` is the thin Deno adapter
+that wires in the real Supabase client and `fetch`). Deployed with `verify_jwt: true`.
+
+Unlike `create-checkout`/`customer-portal`, this function uses **only the caller's own JWT**
+to build its Supabase client — never the service-role key. Every read (`subscriptions`,
+`lessons`, `learner_mastery`, `learner_interactions`) and write (`learner_interactions`,
+`ai_learning_sessions`) is therefore enforced by the same own-row RLS policies the rest of
+the app already relies on, so this function carries no elevated database access at all.
+
+It re-checks `hasActiveAccess` itself (mirroring the same `status`/`access_ends_at` rule as
+`has_active_access()` in Postgres) rather than trusting the browser to have gated access —
+the frontend only ever reaches Lia after the paywall, but the function does not assume that.
+
+The LLM never decides mastery: it may return a `recommended_action`, which is logged to
+`ai_learning_sessions` as an advisory record, but `learner_mastery.mastery_score` is only
+ever moved by graded (`quiz`/`practice`) interactions per Stage 2's `masteryEngine.js` — Lia's
+chat interaction types (`help_request`, `explanation_request`, `hint`) never touch it.
+
+A malformed or non-JSON model response never breaks Lia: `parseTutorResponse` degrades to a
+safe fallback shape (see `logic.js`) rather than propagating untrusted fields. A missing
+`AI_API_KEY` returns a clear 503 rather than crashing.
+
+#### Required secrets
+
+Set these only in **Supabase Edge Function Secrets** (in addition to the auto-injected
+`SUPABASE_URL`/`SUPABASE_ANON_KEY`, which every Edge Function already receives):
+
+| Secret name | Purpose |
+|---|---|
+| `AI_API_KEY` | API key for the chosen LLM provider. Without it, `ai-tutor` returns a friendly "temporarily unavailable" response instead of erroring. |
+| `AI_MODEL` | Model identifier to request from that provider (e.g. an Anthropic, OpenAI, or Gemini model name). |
+| `AI_PROVIDER` | Optional. One of `anthropic` (default), `openai`, `gemini`. Selects which HTTP API `providerRequest` builds a request for. |
+
+These three were **not** set as part of deploying this function — it was deployed and is live,
+but will answer with the safe fallback ("A Lia está temporariamente indisponível…") until a
+project administrator sets them via the Supabase Dashboard (Edge Functions → Secrets) or the
+Supabase CLI (`supabase secrets set`).
 
 ### Required secrets
 

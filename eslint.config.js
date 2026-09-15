@@ -1,7 +1,7 @@
 import js from "@eslint/js";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "node_modules/**", "supabase/functions/**/*.ts"] },
   js.configs.recommended,
   {
     files: ["site/**/*.js"],
@@ -27,6 +27,10 @@ export default [
   {
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: { process: "readonly", URL: "readonly" } }
+  },
+  {
+    files: ["supabase/functions/**/*.js"],
+    languageOptions: { ecmaVersion: "latest", sourceType: "module" }
   },
   {
     files: ["tests/**/*.js"],

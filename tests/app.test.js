@@ -25,6 +25,7 @@ test("module bootstraps the auth gate without creating global app state", async 
       if (url.includes("/subscriptions")) return response([{ status: "active", access_ends_at: "2100-01-01T00:00:00Z" }]);
       if (url.includes("/lessons")) return response([{ id: 1, title: attack, icon: attack, level: attack, duration_minutes: 10 }]);
       if (url.includes("/lesson_progress")) return response([]);
+      if (url.includes("/learner_mastery")) return response([]);
       throw new Error(`Unexpected request: ${url}`);
     };
     dom.window.document.querySelector("#loginTab").click();

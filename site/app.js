@@ -1,4 +1,5 @@
 import { firstName, hasAccess, progress } from "./model.js";
+import { recommendNext } from "./masteryEngine.js";
 import { accountView, coursesView, helperView, homeView, lessonView, noticeView, paywallView, show } from "./views.js";
 
 const URL = "https://nhmzuqhjhkdklezimmll.supabase.co";
@@ -23,6 +24,7 @@ const state = {
   subscription: null,
   lessons: [],
   done: [],
+  masteryRecords: [],
   mode: "login"
 };
 state.user = state.session?.user || null;
@@ -169,10 +171,12 @@ async function loadAccount() {
   state.subscription = subscriptions[0] || null;
   state.lessons = [];
   state.done = [];
+  state.masteryRecords = [];
   if (access()) {
     state.lessons = await api("/rest/v1/lessons?select=*&published=eq.true&order=sort_order.asc");
     state.done = (await api(`/rest/v1/lesson_progress?select=lesson_id&user_id=eq.${userId}`))
       .map(item => item.lesson_id);
+    state.masteryRecords = await api(`/rest/v1/learner_mastery?select=skill_key,mastery_score&user_id=eq.${userId}`);
   }
 }
 
@@ -201,8 +205,10 @@ function render(view = "home") {
   const handlers = { onView: render, onLesson: openLesson, onPortal: portal, onLogout: logout };
   if (view === "home") show(dom.app, ...homeView(context, handlers));
   else if (view === "courses") show(dom.app, ...coursesView(context, handlers));
-  else if (view === "helper") show(dom.app, ...helperView());
-  else if (view === "profile") show(dom.app, ...accountView(context, handlers));
+  else if (view === "helper") {
+    const next = recommendNext(state.lessons, state.done, state.masteryRecords).lesson;
+    show(dom.app, ...helperView({ lessonId: next?.id ?? null, lessonTitle: next?.title ?? null }, { onAsk: askLia }));
+  } else if (view === "profile") show(dom.app, ...accountView(context, handlers));
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -241,6 +247,17 @@ async function checkout(button, output) {
     button.disabled = false;
     button.textContent = "Tentar novamente";
   }
+}
+
+async function askLia(lessonId, message, interactionType) {
+  const response = await fetch(`${FUNCTIONS}/ai-tutor`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ lesson_id: lessonId, message, interaction_type: interactionType })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Não foi possível obter resposta da Lia.");
+  return data;
 }
 
 async function portal(output) {
