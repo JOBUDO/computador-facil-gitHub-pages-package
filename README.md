@@ -26,6 +26,8 @@ site/                         Editable static website source
 dist/                         Generated Pages artifact (ignored by Git)
 supabase/migrations/          SQL applied to the production Supabase project (history/review only —
                                this repo does not run the Supabase CLI locally)
+supabase/functions/ai-tutor/  Lia's AI-tutor Edge Function source (logic.js is pure/unit-tested;
+                               index.ts is the Deno adapter, deployed directly, not via this repo's CI)
 .github/workflows/            GitHub Pages deployment workflow
 ```
 

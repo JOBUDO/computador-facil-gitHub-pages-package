@@ -126,20 +126,70 @@ export function lessonView(lesson, total, completed, { onBack, onComplete }) {
   ];
 }
 
-export function helperView() {
+/**
+ * @param {{ lessonId?: number|null, lessonTitle?: string|null }} context
+ * @param {{ onAsk?: (lessonId: number|null, message: string, interactionType: string) => Promise<{response: string}> }} handlers
+ */
+export function helperView({ lessonId = null, lessonTitle = null } = {}, { onAsk } = {}) {
   const answerArea = el("div", "");
   const questions = [
     ["📋 Como copiar e colar?", "Para copiar, seleciona o texto e usa Ctrl + C. Para colar, usa Ctrl + V."],
     ["📁 Como criar uma pasta?", "Clica com o botão direito, escolhe Novo e depois Pasta."],
     ["🛡️ Como reconhecer um email falso?", "Confirma o remetente e desconfia de urgência, dinheiro ou pedidos de palavra-passe."]
   ];
+
+  const log = el("div", "lia-log");
+  const status = el("p", "form-message");
+  const input = el("input", "");
+  input.type = "text";
+  input.placeholder = lessonTitle ? `Pergunta sobre "${lessonTitle}"…` : "Escreve a tua pergunta…";
+  const sendButton = button("", "➤", () => ask(input.value, "help_request"));
+
+  async function ask(message, interactionType) {
+    if (!message.trim() || !onAsk) return;
+    log.append(el("div", "answer mine", message));
+    input.value = "";
+    input.disabled = true;
+    sendButton.disabled = true;
+    status.textContent = "A Lia está a pensar…";
+    try {
+      const result = await onAsk(lessonId, message, interactionType);
+      log.append(el("div", "answer", el("strong", "", "Lia: "), result.response));
+      status.textContent = "";
+    } catch (error) {
+      status.textContent = error.message || "Não foi possível obter resposta da Lia.";
+    } finally {
+      input.disabled = false;
+      sendButton.disabled = false;
+    }
+  }
+
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      ask(input.value, "help_request");
+    }
+  });
+
+  const quickActions = [
+    ["Explica de outra maneira", "explanation_request"],
+    ["Explica de forma mais simples", "explanation_request"],
+    ["Dá-me um exemplo", "explanation_request"],
+    ["Guia-me passo a passo", "hint"]
+  ];
+
   return [
     el("div", "helper-card", el("div", "helper-orb"), el("h2", "", "Olá, sou a Lia"),
       el("p", "", "Explico cada passo em português simples, sem pressa.")),
     el("div", "section-title", el("h2", "", "Como posso ajudar?")),
     answerArea,
     el("div", "quick-questions", ...questions.map(([question, answer]) =>
-      button("", question, () => show(answerArea, el("div", "answer", el("strong", "", "Lia:"), el("br", ""), answer)))))
+      button("", question, () => show(answerArea, el("div", "answer", el("strong", "", "Lia:"), el("br", ""), answer))))),
+    el("div", "section-title", el("h2", "", "Pergunta à Lia")),
+    log,
+    el("div", "quick-questions", ...quickActions.map(([label, type]) => button("", label, () => ask(label, type)))),
+    el("div", "chatbox", input, sendButton),
+    status
   ];
 }
 

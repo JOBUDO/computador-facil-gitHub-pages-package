@@ -3,11 +3,11 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 import { accountView, coursesView, helperView, homeView, lessonView, noticeView, paywallView, show } from "../site/views.js";
 
-function withDocument(run) {
+async function withDocument(run) {
   const dom = new JSDOM("<!doctype html><main id='app'></main>");
   globalThis.document = dom.window.document;
   try {
-    return run(dom.window.document.querySelector("#app"));
+    return await run(dom.window.document.querySelector("#app"));
   } finally {
     delete globalThis.document;
     dom.window.close();
@@ -76,4 +76,53 @@ test("paywall text is safe and helper answers use DOM nodes", () => withDocument
   root.querySelector(".quick-questions button").click();
   assert.equal(root.querySelector(".answer strong").textContent, "Lia:");
   assert.match(root.querySelector(".answer").textContent, /Ctrl \+ C/);
+}));
+
+test("Lia chat sends the learner's message with the right interaction_type and renders the reply as text", () => withDocument(async root => {
+  const calls = [];
+  const onAsk = async (lessonId, message, type) => {
+    calls.push({ lessonId, message, type });
+    return { response: attack };
+  };
+  show(root, ...helperView({ lessonId: 7, lessonTitle: "Ficheiros" }, { onAsk }));
+
+  const input = root.querySelector(".chatbox input");
+  const sendButton = root.querySelector(".chatbox button");
+  input.value = "Não percebo a diferença";
+  sendButton.click();
+  await new Promise(setImmediate);
+
+  assert.deepEqual(calls[0], { lessonId: 7, message: "Não percebo a diferença", type: "help_request" });
+  assert.equal(root.querySelector(".lia-log img"), null);
+  assert.match(root.querySelector(".lia-log").textContent, /<img/);
+  assert.equal(input.value, "");
+  assert.equal(input.disabled, false);
+}));
+
+test("Lia chat surfaces a friendly error and re-enables the input without breaking the interface", () => withDocument(async root => {
+  const onAsk = async () => { throw new Error("A Lia está temporariamente indisponível."); };
+  show(root, ...helperView({ lessonId: null }, { onAsk }));
+
+  const input = root.querySelector(".chatbox input");
+  const sendButton = root.querySelector(".chatbox button");
+  input.value = "Olá";
+  sendButton.click();
+  await new Promise(setImmediate);
+
+  assert.match(root.querySelector(".form-message").textContent, /temporariamente indisponível/);
+  assert.equal(input.disabled, false);
+  assert.equal(sendButton.disabled, false);
+}));
+
+test("Lia's quick-action buttons send the expected interaction_type", () => withDocument(async root => {
+  const calls = [];
+  const onAsk = async (lessonId, message, type) => { calls.push(type); return { response: "ok" }; };
+  show(root, ...helperView({ lessonId: 1 }, { onAsk }));
+
+  const [, tutorQuickQuestions] = root.querySelectorAll(".quick-questions");
+  const buttons = tutorQuickQuestions.querySelectorAll("button");
+  buttons[buttons.length - 1].click(); // "Guia-me passo a passo"
+  await new Promise(setImmediate);
+
+  assert.equal(calls[0], "hint");
 }));
