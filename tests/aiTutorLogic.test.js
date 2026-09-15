@@ -155,6 +155,18 @@ test("handleAiTutorRequest: missing AI_API_KEY degrades gracefully instead of br
   assert.match(result.body.error, /indisponível/);
 });
 
+test("handleAiTutorRequest: an unrecognised AI_PROVIDER degrades gracefully instead of crashing", async () => {
+  let providerCalled = false;
+  const result = await handleAiTutorRequest({
+    body: validBody,
+    env: { aiApiKey: "key", aiModel: "model", aiProvider: "opencode" },
+    deps: baseDeps({ callProvider: async () => { providerCalled = true; return ""; } })
+  });
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /indisponível/);
+  assert.equal(providerCalled, false);
+});
+
 test("handleAiTutorRequest: an AI timeout is reported as 504 without storing anything", async () => {
   const saved = [];
   const timeoutError = Object.assign(new Error("aborted"), { name: "AbortError" });
