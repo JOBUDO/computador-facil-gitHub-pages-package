@@ -35,6 +35,19 @@ The active application expects these public-schema tables:
 
 Every exposed table must have Row Level Security enabled. The browser must never be able to insert, update or delete `subscriptions`; only the trusted Stripe webhook can change access.
 
+### Adaptive learning tables (AI feature, Stage 1)
+
+| Table | Purpose | Browser permission |
+|---|---|---|
+| `learner_mastery` | One row per learner + skill; tracks mastery score, attempts | Own rows only (select/insert/update) |
+| `learner_interactions` | Append-only log of quizzes, practice, help requests, hints | Own rows only (select/insert) |
+| `ai_learning_sessions` | Append-only log of AI-tutor recommendations | Own rows only (select/insert) |
+
+These are scoped by ownership only (not by paid entitlement) and follow the same
+`auth.uid() = user_id` RLS pattern as the tables above. `lessons` also gained four nullable
+columns (`skill_key`, `learning_objective`, `mastery_threshold`, `prerequisite_skill`) that
+existing lessons leave `null`. See `supabase/README.md` for full detail and rollback SQL.
+
 ## Required Edge Functions
 
 | Function | Called by | Responsibility |
