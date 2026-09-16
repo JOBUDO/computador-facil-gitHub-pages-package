@@ -10,7 +10,7 @@ the same order as their filenames. Each file's rollback SQL is included as a com
 
 | Table | Purpose | Write access | Notes |
 |---|---|---|---|
-| `learner_mastery` | One row per learner + `skill_key`, tracking `mastery_score` (0–100), `attempts`, `correct_attempts` | Learner can select/insert/update their own rows | Unique on `(user_id, skill_key)`; the mastery engine (Stage 2) reads/writes this |
+| `learner_mastery` | One row per learner + `skill_key`, tracking `mastery_score` (0–100), `attempts`, `correct_attempts`, `help_requests` | Learner can select/insert/update their own rows | Unique on `(user_id, skill_key)`; the mastery engine (Stage 2) reads/writes this. `help_requests` (Stage 4) is bumped by `ai-tutor` on every `explanation_request` and never affects `mastery_score` |
 | `learner_interactions` | Append-only log of learner activity: quizzes, practice, help requests, hints, lesson completions | Learner can select/insert their own rows (no update/delete — it's a history log) | `interaction_type` is constrained to a fixed set; `metadata` is `jsonb` for free-form detail |
 | `ai_learning_sessions` | Append-only log of AI-tutor session outcomes (`recommended_action`, `difficulty_level`, `summary`) | Learner can select/insert their own rows | Written by the frontend directly for now; Stage 3's `ai-tutor` Edge Function may also write to it using the service-role key, which bypasses RLS by design |
 

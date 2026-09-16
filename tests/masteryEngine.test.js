@@ -4,7 +4,8 @@ import {
   masteryState,
   nextMastery,
   recommendedAction,
-  recommendNext
+  recommendNext,
+  resolveRecommendedLesson
 } from "../site/masteryEngine.js";
 
 test("recommendedAction maps score ranges to actions", () => {
@@ -82,4 +83,24 @@ test("recommendNext advances once the prerequisite is met and there is no master
 test("recommendNext reflects the lesson's own skill mastery once a record exists", () => {
   const result = recommendNext(lessons, [], [{ skill_key: "mouse_basics", mastery_score: 20 }]);
   assert.deepEqual(result, { lesson: lessons[0], action: "reinforce" });
+});
+
+test("resolveRecommendedLesson points at the lesson teaching the missing prerequisite skill, not the locked lesson recommendNext names", () => {
+  const recommendation = recommendNext(lessons, [1], [{ skill_key: "mouse_basics", mastery_score: 50 }]);
+  assert.equal(recommendation.action, "review_prerequisite");
+  assert.equal(recommendation.lesson, lessons[1]); // the locked lesson, per recommendNext's own contract
+
+  const resolved = resolveRecommendedLesson(lessons, recommendation);
+  assert.equal(resolved, lessons[0]); // the lesson that actually teaches "mouse_basics"
+});
+
+test("resolveRecommendedLesson falls back to the locked lesson when no lesson teaches the prerequisite skill", () => {
+  const recommendation = { lesson: { id: 9, prerequisite_skill: "nonexistent_skill" }, action: "review_prerequisite" };
+  assert.equal(resolveRecommendedLesson(lessons, recommendation), recommendation.lesson);
+});
+
+test("resolveRecommendedLesson is a no-op for every action other than review_prerequisite", () => {
+  assert.equal(resolveRecommendedLesson(lessons, { lesson: lessons[0], action: "advance" }), lessons[0]);
+  assert.equal(resolveRecommendedLesson(lessons, { lesson: lessons[1], action: "practice" }), lessons[1]);
+  assert.equal(resolveRecommendedLesson(lessons, null), null);
 });

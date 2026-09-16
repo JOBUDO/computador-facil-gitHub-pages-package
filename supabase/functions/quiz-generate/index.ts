@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { handleAiTutorRequest, hasActiveAccess } from "./logic.js";
+import { handleQuizGenerateRequest } from "./logic.js";
+import { hasActiveAccess } from "../ai-tutor/logic.js";
 
 const AI_TIMEOUT_MS = 20000;
 
@@ -16,9 +17,8 @@ Deno.serve(async request => {
   const authHeader = request.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer\s+/i, "");
 
-  // Scoped to the caller's own JWT (never the service-role key): every read
-  // and write below is enforced by the same own-row RLS policies the rest of
-  // the app relies on, so this function never needs elevated database access.
+  // Scoped to the caller's own JWT (never the service-role key), same as ai-tutor — this
+  // function only reads, it writes nothing, so it needs no elevated database access at all.
   const supabase = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } }
   });
@@ -38,7 +38,7 @@ Deno.serve(async request => {
 
   const deps = {
     requestId: crypto.randomUUID(),
-    log: entry => console.log(JSON.stringify({ fn: "ai-tutor", ...entry })),
+    log: entry => console.log(JSON.stringify({ fn: "quiz-generate", ...entry })),
 
     getUser: async () => {
       if (!jwt) return null;
@@ -65,60 +65,6 @@ Deno.serve(async request => {
       return data ?? null;
     },
 
-    getMastery: async (userId, skillKey) => {
-      const { data } = await supabase
-        .from("learner_mastery")
-        .select("mastery_score, attempts, correct_attempts")
-        .eq("user_id", userId)
-        .eq("skill_key", skillKey)
-        .maybeSingle();
-      return data ?? null;
-    },
-
-    getRecentInteractions: async (userId, { lessonId, skillKey }) => {
-      let query = supabase
-        .from("learner_interactions")
-        .select("question, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (lessonId) query = query.eq("lesson_id", lessonId);
-      else if (skillKey) query = query.eq("skill_key", skillKey);
-      const { data } = await query;
-      return data ?? [];
-    },
-
-    countInteractionsByType: async (userId, { lessonId, interactionType }) => {
-      let query = supabase
-        .from("learner_interactions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("interaction_type", interactionType);
-      if (lessonId) query = query.eq("lesson_id", lessonId);
-      const { count } = await query;
-      return count ?? 0;
-    },
-
-    // Bumps learner_mastery.help_requests without touching mastery_score/attempts — those are
-    // only ever moved by graded (quiz/practice) interactions, per masteryEngine.js.
-    incrementHelpSignal: async (userId, skillKey) => {
-      const { data: existing } = await supabase
-        .from("learner_mastery")
-        .select("help_requests")
-        .eq("user_id", userId)
-        .eq("skill_key", skillKey)
-        .maybeSingle();
-      await supabase.from("learner_mastery").upsert(
-        {
-          user_id: userId,
-          skill_key: skillKey,
-          help_requests: (existing?.help_requests ?? 0) + 1,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: "user_id,skill_key" }
-      );
-    },
-
     callProvider: async ({ url, headers, body: requestBody, extractText }) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -137,18 +83,10 @@ Deno.serve(async request => {
       } finally {
         clearTimeout(timeout);
       }
-    },
-
-    saveInteraction: async row => {
-      await supabase.from("learner_interactions").insert(row);
-    },
-
-    saveAiSession: async row => {
-      await supabase.from("ai_learning_sessions").insert(row);
     }
   };
 
-  const result = await handleAiTutorRequest({ body, env, deps });
+  const result = await handleQuizGenerateRequest({ body, env, deps });
   return new Response(JSON.stringify(result.body), {
     status: result.status,
     headers: { ...corsHeaders, "content-type": "application/json" }

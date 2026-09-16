@@ -1,6 +1,19 @@
 import { firstName, hasAccess, progress } from "./model.js";
-import { recommendNext } from "./masteryEngine.js";
-import { accountView, coursesView, helperView, homeView, lessonView, noticeView, paywallView, show } from "./views.js";
+import { nextMastery, recommendNext, resolveRecommendedLesson } from "./masteryEngine.js";
+import { foldQuizIntoMastery, quizAction, scoreQuiz } from "./quizEngine.js";
+import {
+  accountView,
+  coursesView,
+  helperView,
+  homeView,
+  lessonView,
+  noticeView,
+  paywallView,
+  practiceView,
+  quizResultView,
+  quizView,
+  show
+} from "./views.js";
 
 const URL = "https://nhmzuqhjhkdklezimmll.supabase.co";
 const KEY = "sb_publishable_8Mna1mVDvCrbwsJkSvofWg_pY8pelK7";
@@ -176,7 +189,17 @@ async function loadAccount() {
     state.lessons = await api("/rest/v1/lessons?select=*&published=eq.true&order=sort_order.asc");
     state.done = (await api(`/rest/v1/lesson_progress?select=lesson_id&user_id=eq.${userId}`))
       .map(item => item.lesson_id);
-    state.masteryRecords = await api(`/rest/v1/learner_mastery?select=skill_key,mastery_score&user_id=eq.${userId}`);
+    // Mastery data is an enhancement, not a requirement: a learner with none yet (new
+    // account), an old account predating Stage 1, or a transient database failure here must
+    // never block the rest of the app — recommendNext already falls back to plain sequential
+    // "advance" behaviour when masteryRecords is empty.
+    try {
+      state.masteryRecords = await api(
+        `/rest/v1/learner_mastery?select=skill_key,mastery_score,attempts,correct_attempts&user_id=eq.${userId}`
+      );
+    } catch {
+      state.masteryRecords = [];
+    }
   }
 }
 
@@ -193,6 +216,7 @@ function render(view = "home") {
   dom.nav.querySelectorAll("button").forEach(item =>
     item.classList.toggle("active", item.dataset.view === view));
   dom.avatarInitial.textContent = firstName(state.profile, state.user)[0].toUpperCase();
+  const recommendation = recommendNext(state.lessons, state.done, state.masteryRecords);
   const context = {
     first: firstName(state.profile, state.user),
     profile: state.profile,
@@ -200,16 +224,27 @@ function render(view = "home") {
     subscription: state.subscription,
     lessons: state.lessons,
     done: state.done,
-    percent: progress(state.done, state.lessons)
+    percent: progress(state.done, state.lessons),
+    recommendation
   };
-  const handlers = { onView: render, onLesson: openLesson, onPortal: portal, onLogout: logout };
+  const handlers = { onView: render, onLesson: openLesson, onFollow: followRecommendation, onPortal: portal, onLogout: logout };
   if (view === "home") show(dom.app, ...homeView(context, handlers));
   else if (view === "courses") show(dom.app, ...coursesView(context, handlers));
   else if (view === "helper") {
-    const next = recommendNext(state.lessons, state.done, state.masteryRecords).lesson;
+    const next = recommendation.lesson;
     show(dom.app, ...helperView({ lessonId: next?.id ?? null, lessonTitle: next?.title ?? null }, { onAsk: askLia }));
   } else if (view === "profile") show(dom.app, ...accountView(context, handlers));
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// Stage 6: follows the home page's adaptive recommendation. "practice" opens an AI practice
+// mission (Stage 7) instead of a lesson; every other action just opens the recommended lesson
+// — the learner can always ignore this and browse all lessons via "Ver todas as aulas" instead.
+function followRecommendation(recommendation) {
+  const lesson = resolveRecommendedLesson(state.lessons, recommendation);
+  if (!lesson) return render("courses");
+  if (recommendation.action === "practice") return openPractice(lesson);
+  return openLesson(lesson.id);
 }
 
 function openLesson(id) {
@@ -226,12 +261,181 @@ function openLesson(id) {
           body: JSON.stringify({ user_id: state.user.id, lesson_id: id })
         });
         state.done.push(id);
-        render("courses");
+        openQuiz(lesson);
       } catch (error) {
         dom.app.querySelector(".form-message").textContent = error.message || "Não foi possível guardar o progresso.";
       }
-    }
+    },
+    onExplain: () => askLia(id, "Não percebi esta lição. Podes explicar de outra maneira?", "explanation_request")
   }));
+}
+
+async function generateQuiz(lessonId) {
+  const response = await fetch(`${FUNCTIONS}/quiz-generate`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ lesson_id: lessonId })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Não foi possível gerar o teste.");
+  return data;
+}
+
+// Stage 5: the AI only proposes questions; grading, the score and the mastery update are
+// always calculated here, in the application, never by the model (see quizEngine.js).
+async function recordQuizResults(lesson, results) {
+  const skillKey = lesson.skill_key ?? null;
+  const existing = state.masteryRecords.find(record => record.skill_key === skillKey);
+  const percent = scoreQuiz(results);
+
+  await Promise.all(results.map((result, questionIndex) => api("/rest/v1/learner_interactions", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      user_id: state.user.id,
+      lesson_id: lesson.id,
+      skill_key: skillKey,
+      interaction_type: "quiz",
+      question: result.question,
+      result: result.correct ? "correct" : "incorrect",
+      metadata: {
+        score: percent,
+        attempt: questionIndex + 1,
+        selected_index: result.selectedIndex,
+        correct_index: result.correctIndex
+      }
+    })
+  })));
+
+  let masteryScore = percent;
+  if (skillKey) {
+    const folded = foldQuizIntoMastery(existing, results);
+    masteryScore = folded.score;
+    await api("/rest/v1/learner_mastery", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        user_id: state.user.id,
+        skill_key: skillKey,
+        mastery_score: folded.score,
+        attempts: folded.attempts,
+        correct_attempts: folded.correctAttempts,
+        last_activity_at: new Date().toISOString()
+      })
+    });
+    const updated = { skill_key: skillKey, mastery_score: folded.score, attempts: folded.attempts, correct_attempts: folded.correctAttempts };
+    const recordIndex = state.masteryRecords.findIndex(record => record.skill_key === skillKey);
+    if (recordIndex >= 0) state.masteryRecords[recordIndex] = updated;
+    else state.masteryRecords.push(updated);
+  }
+
+  return { percent, action: quizAction(masteryScore) };
+}
+
+function openQuiz(lesson) {
+  show(dom.app, noticeView("A preparar o teste…", "Só demora um instante."));
+  generateQuiz(lesson.id)
+    .then(quiz => {
+      show(dom.app, ...quizView(lesson, quiz, {
+        onFinish: async results => {
+          try {
+            const { percent, action } = await recordQuizResults(lesson, results);
+            show(dom.app, ...quizResultView(percent, action, { onContinue: () => render("courses") }));
+          } catch (error) {
+            show(dom.app, noticeView("Não foi possível guardar o resultado", error.message || "Tenta novamente mais tarde.", {
+              onRetry: () => render("courses")
+            }));
+          }
+        },
+        onSkip: () => render("courses")
+      }));
+    })
+    .catch(error => {
+      // The lesson itself is already marked complete at this point — never leave the learner
+      // on a dead end just because the (optional) quiz failed to generate.
+      show(dom.app, noticeView("Não foi possível preparar o teste", error.message || "Tenta novamente mais tarde.", {
+        onRetry: () => render("courses")
+      }));
+    });
+}
+
+async function generateMission(lessonId) {
+  const response = await fetch(`${FUNCTIONS}/practice-mission`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ lesson_id: lessonId })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Não foi possível gerar a missão.");
+  return data;
+}
+
+// Stage 7: the outcome the learner picks is the mastery signal — "Consegui" is the only
+// outcome that folds in as a correct graded "practice" attempt.
+async function recordMissionOutcome(lesson, mission, outcome) {
+  const skillKey = lesson.skill_key ?? null;
+  await api("/rest/v1/learner_interactions", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      user_id: state.user.id,
+      lesson_id: lesson.id,
+      skill_key: skillKey,
+      interaction_type: "practice",
+      question: mission.mission,
+      result: outcome,
+      metadata: { difficulty: mission.difficulty }
+    })
+  });
+
+  if (!skillKey) return;
+  const existing = state.masteryRecords.find(record => record.skill_key === skillKey);
+  const folded = nextMastery(
+    { score: existing?.mastery_score ?? 0, attempts: existing?.attempts ?? 0, correctAttempts: existing?.correct_attempts ?? 0 },
+    { type: "practice", correct: outcome === "Consegui" }
+  );
+  await api("/rest/v1/learner_mastery", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      user_id: state.user.id,
+      skill_key: skillKey,
+      mastery_score: folded.score,
+      attempts: folded.attempts,
+      correct_attempts: folded.correctAttempts,
+      last_activity_at: new Date().toISOString()
+    })
+  });
+  const updated = { skill_key: skillKey, mastery_score: folded.score, attempts: folded.attempts, correct_attempts: folded.correctAttempts };
+  const recordIndex = state.masteryRecords.findIndex(record => record.skill_key === skillKey);
+  if (recordIndex >= 0) state.masteryRecords[recordIndex] = updated;
+  else state.masteryRecords.push(updated);
+}
+
+function openPractice(lesson) {
+  show(dom.app, noticeView("A preparar a tua missão…", "Só demora um instante."));
+  generateMission(lesson.id)
+    .then(mission => {
+      show(dom.app, ...practiceView(lesson, mission, {
+        onBack: () => render("home"),
+        onOutcome: async outcome => {
+          try {
+            await recordMissionOutcome(lesson, mission, outcome);
+            show(dom.app, noticeView("Boa!", "Registámos a tua missão. Continua quando quiseres."));
+            setTimeout(() => render("home"), 1500);
+          } catch (error) {
+            show(dom.app, noticeView("Não foi possível guardar o resultado", error.message || "Tenta novamente mais tarde.", {
+              onRetry: () => render("home")
+            }));
+          }
+        }
+      }));
+    })
+    .catch(error => {
+      show(dom.app, noticeView("Não foi possível preparar a missão", error.message || "Tenta novamente mais tarde.", {
+        onRetry: () => render("home")
+      }));
+    });
 }
 
 async function checkout(button, output) {

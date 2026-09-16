@@ -77,3 +77,15 @@ export function recommendNext(lessons, done, masteryRecords = []) {
 
   return { lesson: next, action: recommendedAction(mastery.mastery_score) };
 }
+
+// recommendNext's `lesson` for "review_prerequisite" is the *locked* lesson (the one the
+// prerequisite gates), not something to open yet — a caller acting on the recommendation
+// (e.g. a "Seguir recomendação" button) needs the lesson that actually teaches the missing
+// prerequisite skill instead. Every other action already points at the right lesson.
+export function resolveRecommendedLesson(lessons, recommendation) {
+  if (!recommendation?.lesson) return null;
+  if (recommendation.action !== "review_prerequisite" || !recommendation.lesson.prerequisite_skill) {
+    return recommendation.lesson;
+  }
+  return lessons.find(lesson => lesson.skill_key === recommendation.lesson.prerequisite_skill) ?? recommendation.lesson;
+}

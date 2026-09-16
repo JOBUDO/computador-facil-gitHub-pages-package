@@ -56,6 +56,8 @@ existing lessons leave `null`. See `supabase/README.md` for full detail and roll
 | `customer-portal` | Authenticated browser | Creates a Stripe Billing Portal session for the caller's Stripe customer. |
 | `stripe-webhook` | Stripe only | Verifies the `Stripe-Signature`, receives lifecycle events and updates `subscriptions`. |
 | `ai-tutor` | Authenticated browser (Lia chat, Stage 3) | Derives the caller from their JWT, re-checks active entitlement server-side, builds a bounded context (current lesson, mastery, last 5 interactions) and calls the configured LLM provider. See below. |
+| `quiz-generate` | Authenticated browser (mini quizzes, Stage 5) | Same JWT-only pattern as `ai-tutor`. Generates 2–3 multiple-choice questions strictly scoped to one lesson, strictly validates the model's JSON before returning it, and writes nothing — grading, scoring and the `learner_mastery` update happen entirely in the frontend (`site/quizEngine.js`), never from the model's own judgement. |
+| `practice-mission` | Authenticated browser (AI practice missions, Stage 7) | Same JWT-only pattern. Generates one short, safe, learner-specific practice exercise for the lesson's skill. The difficulty (`easy`/`standard`/`challenge`) is computed by application code from the caller's own `learner_mastery.mastery_score` — never taken from the model's response, even if it includes one. Sends only lesson/objective/skill/difficulty/prior-attempt-count to the model, never the learner's name or email. Writes nothing; the frontend records the learner's chosen outcome (`Consegui`/`Preciso de ajuda`/`Não consegui`) directly. |
 
 ### `ai-tutor` (AI adaptive learning, Stage 3)
 
@@ -82,7 +84,20 @@ A malformed or non-JSON model response never breaks Lia: `parseTutorResponse` de
 safe fallback shape (see `logic.js`) rather than propagating untrusted fields. A missing
 `AI_API_KEY` returns a clear 503 rather than crashing.
 
+**Repeated `explanation_request` escalation (Stage 4).** When a learner asks Lia for another
+explanation of the *same lesson* more than once, the function counts prior
+`explanation_request` interactions for that `lesson_id` itself (`countInteractionsByType`) and
+picks the strategy — `alternative` (1st), `simpler` (2nd), `guided_exercise` (3rd+) — by that
+count, never by asking the model to decide. The chosen strategy is folded into the system
+prompt and echoed back to the frontend as `strategy`/`attempt_number` so the lesson view can
+keep surfacing each new explanation inline without navigating away. Each request also bumps
+`learner_mastery.help_requests` for the lesson's `skill_key` (Stage 4's help-request signal) —
+`mastery_score` itself still only moves for graded `quiz`/`practice` interactions.
+
 #### Required secrets
+
+`quiz-generate` (Stage 5) and `practice-mission` (Stage 7) reuse these same three secrets and
+the same fallback behaviour — neither needs its own configuration.
 
 Set these only in **Supabase Edge Function Secrets** (in addition to the auto-injected
 `SUPABASE_URL`/`SUPABASE_ANON_KEY`, which every Edge Function already receives):

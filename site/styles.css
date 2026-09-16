@@ -805,6 +805,43 @@ fieldset {
   margin: 13px 0 0
 }
 
+.quiz-container {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  margin: 18px 0
+}
+
+.quiz-options {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0
+}
+
+.quiz-option {
+  border: 1px solid var(--line);
+  background: var(--card-soft);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  text-align: left;
+  color: var(--ink)
+}
+
+.quiz-option:disabled {
+  opacity: .8
+}
+
+.quiz-option.correct {
+  border-color: var(--green);
+  color: var(--green)
+}
+
+.quiz-option.incorrect {
+  border-color: var(--pink);
+  color: var(--pink)
+}
+
 @media(min-width:700px) {
   body {
     padding: 24px 0

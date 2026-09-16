@@ -7,6 +7,30 @@ export const ALLOWED_INTERACTION_TYPES = ["help_request", "explanation_request",
 export const RECOMMENDED_ACTIONS = ["advance", "practice", "reinforce", "review_prerequisite"];
 export const MAX_MESSAGE_LENGTH = 1000;
 
+// Stage 4: repeated "explanation_request" attempts for the same lesson escalate through a
+// fixed ladder decided by application code (a count of prior attempts), never by the model.
+export const EXPLANATION_STRATEGIES = Object.freeze({
+  ALTERNATIVE: "alternative",
+  SIMPLER: "simpler",
+  GUIDED_EXERCISE: "guided_exercise"
+});
+
+const EXPLANATION_STRATEGY_INSTRUCTIONS = {
+  [EXPLANATION_STRATEGIES.ALTERNATIVE]:
+    "This is the learner's first request for another explanation of this lesson. Explain it again using a different approach or a different concrete example than a first explanation would use — do not just repeat the same wording.",
+  [EXPLANATION_STRATEGIES.SIMPLER]:
+    "The learner already asked for an alternative explanation and still did not understand. Use even simpler language: shorter sentences, no technical words at all, and one very concrete everyday example.",
+  [EXPLANATION_STRATEGIES.GUIDED_EXERCISE]:
+    "The learner has asked for help with this lesson multiple times now. Instead of another theoretical explanation, propose one small, safe, step-by-step guided exercise the learner can try right now on their own computer to build understanding by doing."
+};
+
+// attemptNumber is 1 for the first explanation_request on a given lesson, 2 for the second, etc.
+export function explanationStrategyForAttempt(attemptNumber) {
+  if (attemptNumber <= 1) return EXPLANATION_STRATEGIES.ALTERNATIVE;
+  if (attemptNumber === 2) return EXPLANATION_STRATEGIES.SIMPLER;
+  return EXPLANATION_STRATEGIES.GUIDED_EXERCISE;
+}
+
 const FALLBACK_RESPONSE = "Não tenho a certeza de como explicar isso agora — tenta perguntar de outra forma.";
 
 export function hasActiveAccess(subscription, now = new Date()) {
@@ -58,7 +82,17 @@ export function describeRecentDifficulties(interactions) {
     .join("\n");
 }
 
-export function buildSystemPrompt({ learnerContext, lessonContext, learningObjective, mastery, recentDifficulties }) {
+export function buildSystemPrompt({
+  learnerContext,
+  lessonContext,
+  learningObjective,
+  mastery,
+  recentDifficulties,
+  explanationStrategy = null
+}) {
+  const strategyInstruction = explanationStrategy
+    ? `\n\nThe learner said they did not understand and is asking for help again. ${EXPLANATION_STRATEGY_INSTRUCTIONS[explanationStrategy]}`
+    : "";
   return `You are Lia, the AI learning tutor for Computador Fácil.
 
 You teach complete computer beginners.
@@ -104,7 +138,7 @@ Rules:
 12. Never modify the permanent curriculum.
 
 Respond ONLY with a single JSON object matching exactly this shape, and nothing else — no markdown fences, no commentary before or after it:
-{"response": "<learner-facing Portuguese explanation>", "detected_difficulty": "<short label or null>", "recommended_action": "<advance|practice|reinforce|review_prerequisite|null>", "confidence": <number between 0 and 1>}`;
+{"response": "<learner-facing Portuguese explanation>", "detected_difficulty": "<short label or null>", "recommended_action": "<advance|practice|reinforce|review_prerequisite|null>", "confidence": <number between 0 and 1>}${strategyInstruction}`;
 }
 
 // Accepts the raw text returned by the provider and returns a validated,
@@ -217,12 +251,27 @@ export async function handleAiTutorRequest({ body, env, deps }) {
     skillKey: lesson?.skill_key ?? null
   });
 
+  // Stage 4: the attempt count (and therefore the explanation strategy) is decided here, by
+  // application code counting prior explanation_request interactions for this lesson — never
+  // left to the model's judgement.
+  let explanationAttempt = null;
+  let explanationStrategy = null;
+  if (parsed.interactionType === "explanation_request" && parsed.lessonId) {
+    const priorAttempts = await deps.countInteractionsByType(user.id, {
+      lessonId: parsed.lessonId,
+      interactionType: "explanation_request"
+    });
+    explanationAttempt = priorAttempts + 1;
+    explanationStrategy = explanationStrategyForAttempt(explanationAttempt);
+  }
+
   const systemPrompt = buildSystemPrompt({
     learnerContext: describeLearner(user),
     lessonContext: describeLesson(lesson),
     learningObjective: lesson?.learning_objective || "Não definido para esta lição.",
     mastery: describeMastery(mastery),
-    recentDifficulties: describeRecentDifficulties(recentInteractions)
+    recentDifficulties: describeRecentDifficulties(recentInteractions),
+    explanationStrategy
   });
 
   let request;
@@ -263,8 +312,16 @@ export async function handleAiTutorRequest({ body, env, deps }) {
     interaction_type: parsed.interactionType,
     question: parsed.message,
     result: result.response,
-    metadata: { detected_difficulty: result.detected_difficulty, confidence: result.confidence }
+    metadata: {
+      detected_difficulty: result.detected_difficulty,
+      confidence: result.confidence,
+      ...(explanationStrategy ? { explanation_strategy: explanationStrategy, attempt_number: explanationAttempt } : {})
+    }
   });
+
+  if (parsed.interactionType === "explanation_request" && lesson?.skill_key) {
+    await deps.incrementHelpSignal(user.id, lesson.skill_key);
+  }
 
   if (result.recommended_action) {
     await deps.saveAiSession({
@@ -276,5 +333,9 @@ export async function handleAiTutorRequest({ body, env, deps }) {
     });
   }
 
-  return finish(200, result, "success");
+  return finish(
+    200,
+    explanationStrategy ? { ...result, strategy: explanationStrategy, attempt_number: explanationAttempt } : result,
+    "success"
+  );
 }
