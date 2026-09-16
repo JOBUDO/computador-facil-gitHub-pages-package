@@ -56,17 +56,30 @@ export function paywallView(first, { onCheckout, onLogout }) {
   ];
 }
 
-export function homeView({ first, lessons, done, percent }, { onView, onLesson }) {
-  const next = lessons.find(item => !done.includes(item.id)) || lessons[0];
+const RECOMMENDATION_COPY = {
+  advance: { eyebrow: "PRÓXIMA AULA RECOMENDADA" },
+  reinforce: { eyebrow: "VAMOS REVER ISTO PRIMEIRO", note: "Ainda estás a praticar esta competência." },
+  practice: { eyebrow: "MISSÃO RÁPIDA", note: lessonTitle => `Vamos praticar um pouco antes de "${lessonTitle}".` },
+  review_prerequisite: { eyebrow: "VAMOS REVER A BASE PRIMEIRO", note: "Vale a pena consolidar isto antes de avançar." }
+};
+
+// Stage 6: the "Continua a aprender" card follows recommendNext's { lesson, action } — falling
+// back to the original sequential "advance" behaviour whenever there is no mastery data at
+// all (new/old accounts, incomplete metadata, or masteryRecords defaulting to [] after a
+// database failure in app.js). The learner always keeps "Ver todas" to browse freely.
+export function homeView({ first, lessons, done, percent, recommendation }, { onView, onFollow }) {
+  const { lesson: next, action } = recommendation || {};
+  const copy = RECOMMENDATION_COPY[action] || RECOMMENDATION_COPY.advance;
   const continueCard = next
-    ? button("continue-card", "", () => onLesson(next.id))
+    ? button("continue-card", "", () => onFollow(recommendation))
     : el("p", "", "As aulas aparecerão aqui em breve.");
   if (next) {
     const gradient = iconGradient(lessons.indexOf(next));
+    const note = typeof copy.note === "function" ? copy.note(next.title) : copy.note;
     continueCard.replaceChildren(
       el("span", `lesson-icon ${gradient}`.trim(), next.icon),
       el("span", "", el("h3", "", next.title),
-        el("p", "", `${next.duration_minutes} min · ${next.level}`), progressTrack(percent)),
+        el("p", "", note || `${next.duration_minutes} min · ${next.level}`), progressTrack(percent)),
       el("span", "round-arrow", "→")
     );
   }
@@ -76,8 +89,10 @@ export function homeView({ first, lessons, done, percent }, { onView, onLesson }
       el("p", "", "Hoje basta uma pequena conquista. Continua ao teu ritmo."),
       el("span", "streak", "✓ Acesso ativo")),
     el("div", "section-title", el("h2", "", "Continua a aprender"),
-      button("", "Ver todas", () => onView("courses"))),
+      button("", "Ver todas as aulas", () => onView("courses"))),
+    next ? el("p", "eyebrow", copy.eyebrow) : null,
     continueCard,
+    next ? button("text-button", "Seguir recomendação", () => onFollow(recommendation)) : null,
     el("div", "section-title", el("h2", "", "O teu progresso")),
     el("div", "profile-card", el("div", "stats",
       el("div", "stat", el("strong", "", done.length), el("span", "", "AULAS")),
@@ -108,10 +123,38 @@ export function coursesView({ profile, lessons, done, percent }, { onLesson }) {
   ];
 }
 
-export function lessonView(lesson, total, completed, { onBack, onComplete }) {
+export function lessonView(lesson, total, completed, { onBack, onComplete, onExplain }) {
   const completeButton = button("primary full",
     [completed ? "Concluída ✓" : "Marcar como concluída", el("span", "", "→")], onComplete);
   const message = el("p", "form-message");
+
+  const explainStatus = el("p", "form-message");
+  const explanationPanel = el("div", "answer explanation-panel hidden");
+  const explainButton = button("text-button", "Não percebi? Pede outra explicação", requestExplanation);
+
+  async function requestExplanation() {
+    if (!onExplain) return;
+    explainButton.disabled = true;
+    explainStatus.textContent = "A Lia está a preparar uma explicação diferente…";
+    try {
+      const result = await onExplain();
+      explanationPanel.classList.remove("hidden");
+      explanationPanel.replaceChildren(
+        el("strong", "", "Lia: "), result.response, el("br", ""),
+        button("text-button", "Entendi agora", () => {
+          explanationPanel.classList.add("hidden");
+          explainStatus.textContent = "";
+        }),
+        button("text-button", "Ainda não percebi", requestExplanation)
+      );
+      explainStatus.textContent = "";
+    } catch (error) {
+      explainStatus.textContent = error.message || "Não foi possível obter resposta da Lia.";
+    } finally {
+      explainButton.disabled = false;
+    }
+  }
+
   return [
     el("div", "lesson-top", button("back", "‹", onBack),
       el("div", "", el("p", "eyebrow", `LIÇÃO ${lesson.sort_order} DE ${total}`),
@@ -122,7 +165,8 @@ export function lessonView(lesson, total, completed, { onBack, onComplete }) {
       el("div", "step", el("b", "", "1"), el("span", "", "Vê a demonstração devagar e pausa quando precisares.")),
       el("div", "step", el("b", "", "2"), el("span", "", "Repete cada ação no teu computador."))),
     el("div", "instruction", el("h3", "", "Missão prática"), el("p", "", lesson.mission),
-      completeButton, message)
+      completeButton, message,
+      ...(onExplain ? [explainButton, explainStatus, explanationPanel] : []))
   ];
 }
 
@@ -190,6 +234,111 @@ export function helperView({ lessonId = null, lessonTitle = null } = {}, { onAsk
     el("div", "quick-questions", ...quickActions.map(([label, type]) => button("", label, () => ask(label, type)))),
     el("div", "chatbox", input, sendButton),
     status
+  ];
+}
+
+/**
+ * @param {{ title: string, questions: Array<{question: string, options: string[], correct_index: number, explanation: string}> }} lesson
+ * @param {{ questions: Array<{question: string, options: string[], correct_index: number, explanation: string}> }} quiz
+ * @param {{ onFinish: (results: Array<{question: string, correct: boolean, selectedIndex: number, correctIndex: number, explanation: string}>) => void, onSkip: () => void }} handlers
+ */
+export function quizView(lesson, quiz, { onFinish, onSkip }) {
+  const questions = quiz.questions;
+  const results = [];
+  let index = 0;
+  const container = el("div", "quiz-container");
+
+  function renderQuestion() {
+    const question = questions[index];
+    const feedback = el("div", "form-message");
+    const optionButtons = question.options.map((option, optionIndex) =>
+      button("quiz-option", option, () => selectOption(optionIndex)));
+
+    container.replaceChildren(
+      el("p", "eyebrow", `PERGUNTA ${index + 1} DE ${questions.length}`),
+      el("h3", "", question.question),
+      el("div", "quiz-options", ...optionButtons),
+      feedback
+    );
+
+    function selectOption(selectedIndex) {
+      const correct = selectedIndex === question.correct_index;
+      optionButtons.forEach((optionButton, optionIndex) => {
+        optionButton.disabled = true;
+        if (optionIndex === question.correct_index) optionButton.classList.add("correct");
+        else if (optionIndex === selectedIndex) optionButton.classList.add("incorrect");
+      });
+      results.push({
+        question: question.question,
+        correct,
+        selectedIndex,
+        correctIndex: question.correct_index,
+        explanation: question.explanation
+      });
+      const isLast = index === questions.length - 1;
+      feedback.replaceChildren(
+        el("p", "", correct ? "Muito bem! ✓" : "Não é bem isso."),
+        el("p", "", question.explanation),
+        button("primary full", isLast ? "Ver resultado" : "Continuar", () => {
+          if (isLast) return onFinish(results);
+          index += 1;
+          renderQuestion();
+        })
+      );
+    }
+  }
+
+  renderQuestion();
+
+  return [
+    el("header", "page-heading", el("p", "eyebrow", "TESTE RÁPIDO"), el("h1", "", `Mini teste: ${lesson.title}`)),
+    container,
+    button("text-button", "Saltar por agora", onSkip)
+  ];
+}
+
+const QUIZ_ACTION_COPY = {
+  reinforce: { title: "Vamos reforçar", body: "Ainda estás a aprender esta competência — vale a pena rever a lição outra vez." },
+  practice: { title: "Vamos praticar", body: "Estás no bom caminho. Um pouco de prática vai ajudar a consolidar." },
+  advance: { title: "Estás a avançar bem!", body: "Já dominas bem esta competência. Podes seguir para a próxima aula." },
+  review_prerequisite: { title: "Vamos rever a base primeiro", body: "Vale a pena consolidar uma competência anterior antes de continuar." }
+};
+
+export function quizResultView(percent, action, { onContinue }) {
+  const copy = QUIZ_ACTION_COPY[action] || QUIZ_ACTION_COPY.practice;
+  return [
+    el("header", "page-heading", el("p", "eyebrow", "RESULTADO DO TESTE"), el("h1", "", copy.title)),
+    el("div", "profile-card", el("div", "stats",
+      el("div", "stat", el("strong", "", `${percent}%`), el("span", "", "CORRETO")))),
+    el("p", "", copy.body),
+    button("primary full", "Continuar", onContinue)
+  ];
+}
+
+const DIFFICULTY_LABEL = { easy: "Fácil", standard: "Normal", challenge: "Desafio" };
+
+/**
+ * @param {{ title: string }} lesson
+ * @param {{ mission: string, difficulty: string }} mission
+ * @param {{ onOutcome: (outcome: "Consegui"|"Preciso de ajuda"|"Não consegui") => void, onBack: () => void }} handlers
+ */
+export function practiceView(lesson, mission, { onOutcome, onBack }) {
+  const status = el("p", "form-message");
+  /** @type {Array<"Consegui"|"Preciso de ajuda"|"Não consegui">} */
+  const outcomes = ["Consegui", "Preciso de ajuda", "Não consegui"];
+  const outcomeButtons = outcomes.map(outcome =>
+    button("", outcome, () => {
+      outcomeButtons.forEach(outcomeButton => { outcomeButton.disabled = true; });
+      status.textContent = "A guardar…";
+      onOutcome(outcome);
+    }));
+  return [
+    el("div", "lesson-top", button("back", "‹", onBack),
+      el("div", "", el("p", "eyebrow", `MISSÃO PRÁTICA · ${DIFFICULTY_LABEL[mission.difficulty] || "Normal"}`),
+        el("h1", "", lesson.title))),
+    el("div", "instruction", el("h3", "", "A tua missão"), el("p", "", mission.mission)),
+    el("div", "instruction", el("h3", "", "Como correu?"),
+      el("div", "quick-questions", ...outcomeButtons), status)
   ];
 }
 
