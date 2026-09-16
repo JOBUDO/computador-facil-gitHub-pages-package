@@ -225,13 +225,22 @@ export async function handleAiTutorRequest({ body, env, deps }) {
     recentDifficulties: describeRecentDifficulties(recentInteractions)
   });
 
-  const request = providerRequest({
-    provider: env.aiProvider || "anthropic",
-    model: env.aiModel,
-    apiKey: env.aiApiKey,
-    systemPrompt,
-    userMessage: parsed.message
-  });
+  let request;
+  try {
+    request = providerRequest({
+      provider: env.aiProvider || "anthropic",
+      model: env.aiModel,
+      apiKey: env.aiApiKey,
+      systemPrompt,
+      userMessage: parsed.message
+    });
+  } catch {
+    return finish(
+      503,
+      { error: "A Lia está temporariamente indisponível. Tenta novamente mais tarde." },
+      "provider_misconfigured"
+    );
+  }
 
   let rawText;
   try {
