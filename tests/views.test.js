@@ -80,6 +80,31 @@ test("lesson, account, and error messages cannot inject markup", () => withDocum
   assert.equal(root.querySelector(".instruction p").textContent, attack);
 }));
 
+test("noticeView optionally offers a recovery action instead of leaving the learner on a dead end", () => withDocument(root => {
+  show(root, noticeView("Erro", "algo correu mal"));
+  assert.equal(root.querySelector("button"), null);
+
+  let retried = false;
+  show(root, noticeView("Erro", "algo correu mal", { onRetry: () => { retried = true; } }));
+  const retryButton = root.querySelector("button");
+  assert.equal(retryButton.textContent, "Continuar");
+  retryButton.click();
+  assert.equal(retried, true);
+}));
+
+test("homeView opens the lesson that actually teaches the missing prerequisite for review_prerequisite, not the locked lesson", () => withDocument(root => {
+  const prerequisiteLesson = { ...lesson, id: 1, title: "Rato e teclado", skill_key: "mouse_basics" };
+  const lockedLesson = { ...lesson, id: 2, title: "Ficheiros e pastas", skill_key: "files_folders", prerequisite_skill: "mouse_basics" };
+  let followed = null;
+  show(root, ...homeView(
+    { first: "Ana", lessons: [prerequisiteLesson, lockedLesson], done: [], percent: 0, recommendation: { lesson: lockedLesson, action: "review_prerequisite" } },
+    { onView: () => {}, onFollow: rec => { followed = rec; } }
+  ));
+  assert.equal(root.querySelector(".continue-card h3").textContent, "Rato e teclado");
+  root.querySelector(".continue-card").click();
+  assert.equal(followed.lesson, lockedLesson); // homeView still hands the raw recommendation up; app.js resolves it the same way
+}));
+
 test("lessonView's 'Não percebi' action renders the explanation inline, never navigates away, and escalates on repeat", () => withDocument(async root => {
   const explainCalls = [];
   let onCompleteCalled = false;

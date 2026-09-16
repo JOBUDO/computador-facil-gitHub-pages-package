@@ -1,5 +1,5 @@
 import { firstName, hasAccess, progress } from "./model.js";
-import { nextMastery, recommendNext } from "./masteryEngine.js";
+import { nextMastery, recommendNext, resolveRecommendedLesson } from "./masteryEngine.js";
 import { foldQuizIntoMastery, quizAction, scoreQuiz } from "./quizEngine.js";
 import {
   accountView,
@@ -241,9 +241,10 @@ function render(view = "home") {
 // mission (Stage 7) instead of a lesson; every other action just opens the recommended lesson
 // — the learner can always ignore this and browse all lessons via "Ver todas as aulas" instead.
 function followRecommendation(recommendation) {
-  if (!recommendation?.lesson) return render("courses");
-  if (recommendation.action === "practice") return openPractice(recommendation.lesson);
-  return openLesson(recommendation.lesson.id);
+  const lesson = resolveRecommendedLesson(state.lessons, recommendation);
+  if (!lesson) return render("courses");
+  if (recommendation.action === "practice") return openPractice(lesson);
+  return openLesson(lesson.id);
 }
 
 function openLesson(id) {
@@ -341,14 +342,20 @@ function openQuiz(lesson) {
             const { percent, action } = await recordQuizResults(lesson, results);
             show(dom.app, ...quizResultView(percent, action, { onContinue: () => render("courses") }));
           } catch (error) {
-            show(dom.app, noticeView("Não foi possível guardar o resultado", error.message || "Tenta novamente mais tarde."));
+            show(dom.app, noticeView("Não foi possível guardar o resultado", error.message || "Tenta novamente mais tarde.", {
+              onRetry: () => render("courses")
+            }));
           }
         },
         onSkip: () => render("courses")
       }));
     })
     .catch(error => {
-      show(dom.app, noticeView("Não foi possível preparar o teste", error.message || "Tenta novamente mais tarde."));
+      // The lesson itself is already marked complete at this point — never leave the learner
+      // on a dead end just because the (optional) quiz failed to generate.
+      show(dom.app, noticeView("Não foi possível preparar o teste", error.message || "Tenta novamente mais tarde.", {
+        onRetry: () => render("courses")
+      }));
     });
 }
 
@@ -417,13 +424,17 @@ function openPractice(lesson) {
             show(dom.app, noticeView("Boa!", "Registámos a tua missão. Continua quando quiseres."));
             setTimeout(() => render("home"), 1500);
           } catch (error) {
-            show(dom.app, noticeView("Não foi possível guardar o resultado", error.message || "Tenta novamente mais tarde."));
+            show(dom.app, noticeView("Não foi possível guardar o resultado", error.message || "Tenta novamente mais tarde.", {
+              onRetry: () => render("home")
+            }));
           }
         }
       }));
     })
     .catch(error => {
-      show(dom.app, noticeView("Não foi possível preparar a missão", error.message || "Tenta novamente mais tarde."));
+      show(dom.app, noticeView("Não foi possível preparar a missão", error.message || "Tenta novamente mais tarde.", {
+        onRetry: () => render("home")
+      }));
     });
 }
 

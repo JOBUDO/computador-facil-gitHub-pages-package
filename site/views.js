@@ -1,3 +1,5 @@
+import { resolveRecommendedLesson } from "./masteryEngine.js";
+
 // Every dynamic value is appended as a text node. No backend field is parsed as HTML.
 function el(tag, className, ...children) {
   const node = document.createElement(tag);
@@ -68,7 +70,11 @@ const RECOMMENDATION_COPY = {
 // all (new/old accounts, incomplete metadata, or masteryRecords defaulting to [] after a
 // database failure in app.js). The learner always keeps "Ver todas" to browse freely.
 export function homeView({ first, lessons, done, percent, recommendation }, { onView, onFollow }) {
-  const { lesson: next, action } = recommendation || {};
+  const action = recommendation?.action;
+  // For "review_prerequisite", show (and open) the lesson that actually teaches the missing
+  // prerequisite skill, not the locked lesson recommendNext names — otherwise the card's
+  // "rever isto primeiro" copy would point at content the learner still can't do yet.
+  const next = resolveRecommendedLesson(lessons, recommendation);
   const copy = RECOMMENDATION_COPY[action] || RECOMMENDATION_COPY.advance;
   const continueCard = next
     ? button("continue-card", "", () => onFollow(recommendation))
@@ -357,6 +363,8 @@ export function accountView({ first, profile, user, subscription }, { onPortal, 
   ];
 }
 
-export function noticeView(title, message) {
-  return el("div", "instruction", el("h3", "", title), el("p", "", message));
+export function noticeView(title, message, { onRetry = undefined, retryLabel = "Continuar" } = {}) {
+  const children = [el("h3", "", title), el("p", "", message)];
+  if (onRetry) children.push(button("primary full", retryLabel, onRetry));
+  return el("div", "instruction", ...children);
 }
